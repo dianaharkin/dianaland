@@ -14,7 +14,12 @@ She drops a photo in the chat and says roughly where it goes. Everything else is
 3. Convert to `.webp`, sized for the web. Full-bleed backgrounds ~1440px wide;
    cutouts and props smaller. Keep the file under ~400KB unless it's a scene base.
 4. Transparent background where it's a cutout, not a scene.
-5. Name it for where it lives, not how it was made: `assets/forest/diana-stump.webp`.
+5. **Name it for where it lives, and match what is already there.** `assets/` is flat
+   for scene art and props — `assets/diana-forest-gold.webp`, `assets/lion-shadow.webp` —
+   with exactly four subfolders that already exist: `pol/` (the polaroids), `press/`
+   (performance films), `tv/` (the television), `audio/` (sound). Do not invent a new
+   subfolder for one file; 80-odd existing assets follow this convention and a lone
+   `assets/forest/` makes the next thing harder to find, not easier.
 6. Place it at a sensible parallax depth for that screen — match what's already there.
 7. **Show her a preview** before shipping. A screenshot of the screen with it in place.
 

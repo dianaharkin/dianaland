@@ -12,7 +12,6 @@ Live at **welcometodianaland.com**
 |---|---|
 | `chapters.html` | **The site.** The forest, the sea, the funhouse, the temple — all four rooms and everything in them live in this one file. Nearly every change you'll ever want is in here. |
 | `index.html` | The front door. It just points at `chapters.html`. |
-| `memories.html` | The old caption-collecting page. Kept for the record; nothing links to it any more. |
 | `assets/` | Every picture, film and sound the site loads. Grouped so you can find things: `pol/` is the polaroids, `press/` your performance films, `tv/` the television, `audio/` the sound. |
 | `writing/` | **Yours.** Your journals, your voice file, the idea generator, and the files you upload to Claude on your phone. |
 | `.claude/` | The shortcuts. See below. |

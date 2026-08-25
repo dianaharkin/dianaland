@@ -16,4 +16,5 @@
 writing/
 *.md
 .claude/
+.github/
 .DS_Store

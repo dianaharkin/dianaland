@@ -1,0 +1,74 @@
+# Diana's writing must never be reachable on the internet.
+#
+# `.vercelignore` excludes `writing/` from every deploy, and `/ship` checks that line
+# before it opens a pull request. This is the backstop: it checks the LIVE SITE, from
+# a runner that actually has network access, after every merge and once a day.
+#
+# It exists because the check cannot run where it used to. Claude Code sessions for this
+# repo run in the cloud with network limited to package registries and an allowlist, so a
+# session cannot fetch the live site to verify anything. A GitHub runner can.
+#
+# If this fails: the site is publicly serving her journals. Roll back in Vercel
+# (Deployments -> last good one -> Instant Rollback) before doing anything else.
+
+name: writing/ must not be public
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 13 * * *"   # 13:17 UTC daily
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the live site
+        env:
+          # Override with a repository variable (Settings -> Secrets and variables ->
+          # Actions -> Variables) if the domain changes. Before the DNS cutover, set
+          # this to the .vercel.app URL.
+          SITE: ${{ vars.SITE_URL || 'https://welcometodianaland.com' }}
+        run: |
+          set -uo pipefail
+          echo "Checking $SITE"
+
+          # 1. Confirm we are actually looking at Dianaland. Without this, a wrong or
+          #    not-yet-pointed domain 404s on everything and the check passes for the
+          #    worst possible reason.
+          root=""
+          for i in 1 2 3 4 5 6; do
+            root=$(curl -sL --max-time 20 "$SITE/" || true)
+            case "$root" in *Dianaland*) break;; esac
+            echo "  attempt $i: not serving Dianaland yet, waiting for the deploy…"
+            sleep 20
+          done
+          case "$root" in
+            *Dianaland*) echo "  OK - $SITE is serving Dianaland." ;;
+            *) echo "::error::$SITE is not serving Dianaland. This check cannot prove anything about a site it did not reach. Fix SITE_URL or the deploy, then re-run."; exit 1 ;;
+          esac
+
+          # 2. Nothing under writing/ may be reachable.
+          fail=0
+          for path in \
+            "writing/PERMISSIONS.md" \
+            "writing/START-HERE.md" \
+            "writing/voice/VOICE.md" \
+            "writing/corpus/batch-001-journals-2022-2026.md" \
+            "writing/IDEA-GENERATOR.md"
+          do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$SITE/$path")
+            if [ "$code" = "404" ] || [ "$code" = "403" ]; then
+              echo "  OK   $code  /$path"
+            else
+              echo "::error::$code on /$path - Diana's writing is readable on the internet right now."
+              fail=1
+            fi
+          done
+
+          if [ "$fail" != "0" ]; then
+            echo "::error::Roll back in Vercel (Deployments -> last good deployment -> Instant Rollback), then fix .vercelignore before anything else ships."
+            exit 1
+          fi
+          echo "All clear. Nothing from writing/ is reachable."

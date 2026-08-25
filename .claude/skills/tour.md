@@ -7,7 +7,7 @@ She asks where something is. You answer in her words, not in paths.
 
 **Say it like:** "The forest is in chapters.html, about a third of the way down.
 The trees are pictures in the assets folder."
-**Not like:** "chapters.html:1247, assets/forest/banyan-b.webp"
+**Not like:** "chapters.html:1247, assets/matte-master.webp"
 
 If she asks for the whole map, give her this and nothing more:
 

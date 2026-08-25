@@ -57,11 +57,11 @@ exactly the friction we're avoiding. Skip any question she's already answered.
 
 *BROKE:*
 2. "When did you last see it working?" — separates today's change from something older.
-3. "Is it gone on your phone as well, or just on the laptop?" — device or everywhere.
+3. "Is it gone on the iPad as well, or just your phone?" — device or everywhere.
 
 *WRONG:*
 2. "What should it look like instead?" — let her describe it however she wants.
-3. "Is it wrong everywhere, or just on your phone?"
+3. "Is it wrong on the iPad too, or just your phone?"
 
 *NEW:*
 2. "Where would you want it to appear?"
@@ -88,7 +88,8 @@ She should never see the seam. Don't announce which skill you're using — just 
 Say what you're about to do, in one sentence, and what she'll see when it's done:
 > "I'll put the three forest trees back and show you before anything goes live."
 
-Then do it, show her, and wait for "ship it". Never deploy in the same turn — `CLAUDE.md` rule 3.
+Then do it, show her, and wait for "ship it". Never ship in the same turn — `CLAUDE.md` rule 3.
+Shipping means opening a pull request she merges, never a deploy command. See `/ship`.
 
 ## The part that matters most: she should finish knowing something
 
