@@ -1,0 +1,2855 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dianaland</title>
+<style>
+  :root{--night:#0e0716;--moon:#efe6ff;--moon-dim:#b9aed0;--amber:#ffc46b;--rose:#ff4fa3;--violet:#8a4bff;
+    --display:'Didot','Playfair Display',Georgia,serif;--ui:'Futura','Avenir Next',system-ui,sans-serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#000;color:var(--moon);
+    font-family:var(--display);-webkit-user-select:none;user-select:none;
+    -webkit-touch-callout:none;touch-action:none;overscroll-behavior:none}
+  /* DIANA 8/23: "when I hold the lion, the lion icon shows up on screen like
+     a clip art in a white square." That is iOS Safari's long-press image
+     LIFT — it rips the <img> out of the scene and floats it on a white
+     card, which destroys the illusion on every prop in the world, not just
+     the lion. -webkit-touch-callout does not inherit reliably into <img>
+     on iOS, so every image says it for itself; -webkit-user-drag kills the
+     same trick on desktop. Hit-testing is deliberately UNTOUCHED — the props
+     ARE their images (alphaHotspot samples them), so no pointer-events here. */
+  img{-webkit-touch-callout:none;-webkit-user-drag:none;
+    -webkit-user-select:none;user-select:none}
+  #stage{position:fixed;inset:0;overflow:hidden}
+  .chapter{position:absolute;inset:0;opacity:0;pointer-events:none;transition:opacity 1.5s ease}
+  .chapter.on{opacity:1;pointer-events:auto}
+  /* INVARIANT (found and fixed 8/24, PRE-EXISTING): a chapter that is not
+     on screen must never be hit-testable. .chapter sets pointer-events:none,
+     but any descendant that sets pointer-events:AUTO opts itself back in —
+     over the top of whatever is actually on screen. The funhouse's oval
+     mirror (.mirror img, ~line 390) was doing exactly that: at a 1728x962
+     window it lands on the burning door and swallowed every click on
+     "pleasure", so the front entrance to the site did nothing. Caught by
+     elementFromPoint at the door's centre returning mirror-oval.webp.
+     !important because this is an invariant, not a preference — the next
+     prop that wants its own pointer-events must not be able to reopen it. */
+  .chapter:not(.on) *{pointer-events:none!important}
+  /* a finished scrub RELEASES fast — lingering 1.5s left its last video
+     frame double-exposed over the arriving realm (the "sea glitch") */
+  #ch-scrub:not(.on),#ch-scrub2:not(.on),#ch-scrub3:not(.on),#ch-scrub4:not(.on){
+    transition:opacity .35s ease}
+
+  /* ---------- 0 · smoke title ---------- */
+  #ch-title{background:#000;cursor:pointer}
+  #ch-title img{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:min(92vw,140svh);mix-blend-mode:screen;animation:titlebreathe 6s ease-in-out infinite}
+  @keyframes titlebreathe{0%,100%{opacity:.92;transform:translate(-50%,-50%) scale(1)}
+    50%{opacity:1;transform:translate(-50%,-50%) scale(1.015)}}
+
+  /* ---------- 1 · the choice ---------- */
+  /* pure black void; the objects carry all the light. Both buttons sit on
+     the SAME baseline (bottom-aligned images, Diana 8/20) — the door
+     dominates, the easy button reads secondary. Both assets carry real
+     alpha, so no mix-blend-mode is needed (Safari drops blends when
+     combined with filters) */
+  #ch-choice{background:#000}
+  .choice-btn{position:absolute;bottom:26svh;border:0;background:none;
+    cursor:pointer;transition:filter .5s ease,transform .5s ease;transform-origin:bottom center}
+  .choice-btn:hover{transform:scale(1.025)}
+  #choose-door{left:10vw;width:min(34vw,62svh)}
+  #choose-door img{width:100%;filter:brightness(.96) saturate(.94)
+    drop-shadow(0 0 30px rgba(255,180,90,.28))}
+  #choose-door:hover img{filter:brightness(1.05) saturate(1)
+    drop-shadow(0 0 48px rgba(255,196,107,.5))}
+  #choose-easy{right:12vw;width:min(15vw,26svh)}
+  #choose-easy img{width:100%;
+    filter:brightness(.85) saturate(.8) sepia(.22) hue-rotate(-8deg) contrast(1.05)
+      drop-shadow(0 0 34px rgba(255,170,80,.3)) drop-shadow(0 14px 30px rgba(0,0,0,.75))}
+  #choose-easy:hover img{filter:brightness(.93) saturate(.86) sepia(.18) hue-rotate(-8deg) contrast(1.05)
+      drop-shadow(0 0 52px rgba(255,190,100,.5)) drop-shadow(0 14px 30px rgba(0,0,0,.7))}
+  @media (orientation:portrait){
+    #choose-door{left:6vw;width:min(52vw,46svh)}
+    #choose-easy{right:8vw;width:min(24vw,20svh)}
+  }
+  .choice-label{position:absolute;left:0;right:0;text-align:center;font-family:var(--ui);
+    font-size:.66rem;letter-spacing:.32em;text-transform:uppercase;color:var(--moon-dim);
+    bottom:-3.6rem;pointer-events:none}
+  /* "business" and "pleasure" are set in the storybook (pleasure) font, big
+     enough to stay legible; the plain UI (business) font around them is
+     untouched */
+  .choice-label .pfont{font-family:var(--display);font-style:italic;text-transform:lowercase;
+    font-size:1.35rem;letter-spacing:.1em;color:var(--moon);display:block;margin-bottom:.45rem;
+    text-shadow:0 0 22px rgba(255,196,107,.45),0 1px 3px rgba(0,0,0,.9)}
+
+  /* ---------- 1.5 · the walk through the door (scroll-scrubbed) ---------- */
+  #ch-scrub,#ch-scrub2{background:#000}
+  .scrub-video{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);cursor:pointer}
+  /* the clips are 1152w and get upscaled hard on phones: a slight grade cuts the
+     milky compression haze, and the filmic grain overlay below masks the upscale
+     softness (the eye reads fine noise as detail) */
+  #scrub-video,#scrub2-video,#scrub3-video,#scrub4-video{width:100vw;height:100svh;object-fit:cover;
+    filter:contrast(1.08) saturate(1.08)}
+  /* full-bleed like the realm scenes — no cinema letterbox */
+  .filmic{position:absolute;inset:0;pointer-events:none;overflow:hidden;
+    background:radial-gradient(115% 88% at 50% 44%,rgba(0,0,0,0) 56%,rgba(5,2,10,.38) 100%)}
+  .filmic::after{content:'';position:absolute;inset:-3%;mix-blend-mode:overlay;opacity:.13;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") repeat;
+    background-size:240px 240px;animation:grain .9s steps(1) infinite}
+  @keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-7px,4px)}
+    50%{transform:translate(5px,-6px)}75%{transform:translate(-3px,-3px)}100%{transform:translate(0,0)}}
+  .scrub-cue{position:absolute;left:0;right:0;bottom:4.5svh;text-align:center;font-family:var(--ui);
+    font-size:.62rem;letter-spacing:.32em;text-transform:uppercase;color:var(--moon-dim);
+    animation:hintpulse 3s ease-in-out infinite}
+  .scrub-bar{position:absolute;left:50%;bottom:2.6svh;transform:translateX(-50%);width:min(40vw,240px);
+    height:2px;background:rgba(239,230,255,.14);border-radius:2px}
+  .scrub-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--amber),var(--rose));border-radius:2px}
+  @keyframes hintpulse{0%,100%{opacity:.45}50%{opacity:1}}
+
+  /* polaroids of Diana burst from the door as it flies open — DOM on top of
+     the scrubbing video, driven by scrub progress (reversible on scroll-back) */
+  .pols{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:3}
+  .pol{position:absolute;left:50%;top:50%;width:13vmin;padding:1vmin 1vmin 3.4vmin;background:#efe6d8;
+    box-shadow:0 14px 44px rgba(0,0,0,.65);opacity:0;will-change:transform,opacity}
+  .pol img{width:100%;display:block;filter:saturate(.92) contrast(1.03)}
+  /* the Arrival — the new world settles into focus after a match cut */
+  .chapter.arrive .painting{animation:arrive 2.4s cubic-bezier(.2,.7,.25,1) both}
+  @keyframes arrive{from{transform:perspective(1100px) rotateY(var(--ay,0deg)) scale(1.14) translateX(var(--ax,0%)) rotate(var(--ar,0deg))}
+    to{transform:perspective(1100px) rotateY(0deg) scale(1) translateX(0) rotate(0deg)}}
+
+  /* ---------- the index (the easy way) ---------- */
+  #ch-index{background:radial-gradient(120% 100% at 50% 0%,#17101f 0%,#080409 70%)}
+  #index-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:min(90vw,30rem)}
+  #index-card h2{font-style:italic;font-weight:400;letter-spacing:.4em;text-transform:uppercase;
+    font-size:clamp(1.5rem,5vw,2.4rem);margin-bottom:.5rem;
+    text-shadow:0 0 40px rgba(138,75,255,.5)}
+  #index-card .sub{font-style:italic;color:var(--moon-dim);margin-bottom:2.4rem}
+  #index-card nav{display:flex;flex-direction:column;gap:1.1rem;margin-bottom:2.6rem}
+  #index-card nav a{font-family:var(--ui);font-size:.78rem;letter-spacing:.34em;text-transform:uppercase;
+    color:var(--moon);text-decoration:none;opacity:.85;transition:color .4s,opacity .4s}
+  #index-card nav a:hover{opacity:1;color:var(--amber)}
+  #back-door{font-style:italic;color:var(--rose);background:none;border:0;cursor:pointer;
+    font-family:var(--display);font-size:1rem;letter-spacing:.06em}
+  /* ---- dawnend: the business page as the JOURNEY'S COMPLETION ----
+     same card, same links - but it stands in the temple's sunrise, and
+     the words know you took the long way */
+  #ch-index .sub-dawn,#ch-index #end-rule,#ch-index #back-again{display:none}
+  #ch-index.dawnend .sub,#ch-index.dawnend #back-door{display:none}
+  #ch-index.dawnend{background:
+    linear-gradient(rgba(255,243,226,.62),rgba(246,219,199,.8)),
+    url("assets/matte-temple-sunrise.webp") center/cover}
+  #ch-index.dawnend h2{color:#43304e;
+    text-shadow:0 0 26px rgba(255,244,230,.95),0 0 60px rgba(255,220,180,.6)}
+  #ch-index.dawnend .sub-dawn{display:block;color:#5d4054;line-height:1.85;
+    margin-bottom:2.2rem;text-shadow:0 1px 0 rgba(255,250,240,.65)}
+  #ch-index.dawnend nav a{color:#3c2b46;text-shadow:0 1px 0 rgba(255,250,240,.55)}
+  #ch-index.dawnend nav a:hover{color:#8a4bff;opacity:1}
+  #ch-index.dawnend #back-again{display:block;margin:0 auto 1.5rem;font-style:italic;
+    color:#a2426e;background:none;border:0;cursor:pointer;
+    font-family:var(--display);font-size:1rem;letter-spacing:.06em;
+    text-shadow:0 1px 0 rgba(255,250,240,.5)}
+  #ch-index.dawnend #end-rule{display:block;font-style:italic;color:#43304e;
+    font-size:1.08rem;letter-spacing:.04em;
+    text-shadow:0 1px 0 rgba(255,250,240,.6)}
+
+  /* ---------- painting layers (shared) ---------- */
+  .painting{position:absolute;inset:-3%;overflow:hidden}
+  /* A .layer is a PARALLAX CONTAINER, nothing else — a full-screen div whose
+     only job is to move a plate. Three separate props have now been found
+     unclickable because a later container painted over them and ate the
+     click (the front door, "She Is Here" in the forest, and both mirrors
+     painted into the funhouse corridor). Two things make it invisible:
+     `inset:0` means EVERY layer covers the whole screen, and
+     `will-change:transform` makes each one a stacking context, so a child's
+     z-index cannot climb out of its own layer. So: containers decline the
+     pointer, and the props inside them ask for it back by name. Anything
+     new that lives in a .layer and must be touchable belongs on the second
+     line. (.mirror-hot deliberately stays `none` further down — there the
+     IMAGE takes the pointer, not the button, because the button includes
+     the cord and a lot of empty air.) */
+  .layer{position:absolute;inset:0;will-change:transform;pointer-events:none}
+  #diana-forest-hot,#tv-hot,#phone-hot,#doll-hot,
+  #shelf-hot,.book-hot,.bmirror{pointer-events:auto}
+  .layer img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);pointer-events:none}
+  #L-base img{width:max(105vw,251svh);bottom:-2.5svh}
+  #L-fg img{width:max(105vw,251svh);bottom:-2.5svh}
+  /* L-fg is the forest's DECORATIVE foreground foliage, and it is a
+     full-screen .layer div. Its <img> already declines the pointer, but the
+     DIV did not — and because `.layer` sets will-change:transform it forms a
+     stacking context, so Diana's own z-index:5 is trapped inside HER layer
+     and cannot climb over L-fg, which is a later sibling. Net effect: the
+     foliage covered the whole forest and ate every click on
+     #diana-forest-hot — "She Is Here" was unreachable. Decoration must never
+     take a pointer. (PRE-EXISTING, found 8/24. She still renders BEHIND the
+     leaves, which is the intended look — only the hit-testing changed.) */
+  #L-fg{pointer-events:none}
+  .shaft{position:absolute;top:-12%;height:120%;pointer-events:none;mix-blend-mode:screen;
+    background:linear-gradient(102deg,rgba(255,226,170,0) 12%,rgba(255,226,170,.16) 50%,rgba(255,226,170,0) 88%);
+    animation:shaftbreathe 9s ease-in-out infinite}
+  @keyframes shaftbreathe{0%,100%{opacity:.35}50%{opacity:.95}}
+  .fly{position:absolute;width:5px;height:5px;border-radius:50%;background:#ffd98f;
+    box-shadow:0 0 9px 3px rgba(255,196,107,.55);animation:flypulse 4.2s ease-in-out infinite}
+  .fly.c{background:#bfe6ef;box-shadow:0 0 9px 3px rgba(150,210,230,.5)}
+  @keyframes flypulse{0%,100%{opacity:.15;transform:translateY(0)}50%{opacity:.9;transform:translateY(-14px)}}
+  /* explicit width so the button has a real hit area (its img is absolute);
+     left shifts by half the width to keep the heart's center at 66.5% */
+  #heart-hot{position:absolute;left:59.5%;width:14%;top:-3%;height:58%;border:0;background:none;
+    cursor:pointer;transform-origin:top center;animation:heartsway 7.5s ease-in-out infinite;z-index:5}
+  @keyframes heartsway{0%,100%{transform:rotate(2.4deg)}50%{transform:rotate(-2.4deg)}}
+  #heart-hot .cord{position:absolute;left:50%;top:0;width:2px;height:74%;background:linear-gradient(#241608cc,#3a2a18)}
+  #heart-hot img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);height:24%!important;
+    width:auto!important;min-width:0!important;
+    filter:drop-shadow(0 0 22px rgba(255,196,107,.65));transition:filter .5s}
+  #heart-hot:hover img{filter:drop-shadow(0 0 40px rgba(255,196,107,.95))}
+  /* the lion shadow waits utterly still on the lit path — it only stirs
+     (and rumbles) under the cursor: the tell that it listens */
+  #lion-hot{position:absolute;bottom:19%;left:42%;height:12%;border:0;background:none;
+    cursor:pointer;z-index:5;padding:0}
+  #lion-hot img{position:relative;left:auto;bottom:auto;transform:none;
+    height:100%;width:auto;opacity:.62;filter:blur(1px) brightness(.5);
+    transition:opacity .6s,filter .6s;transform-origin:50% 100%}
+  #lion-hot:hover img,#lion-hot:focus-visible img{opacity:.82;filter:blur(.6px) brightness(.64);
+    animation:lionstir 1.8s ease-in-out infinite}
+  @keyframes lionstir{0%,100%{transform:translateY(0) rotate(0)}
+    30%{transform:translateY(-4px) rotate(-1.2deg)}
+    65%{transform:translateY(-1px) rotate(1deg)}}
+  /* Diana in the gold dress, leaning against her tree (main_diana_final,
+     Vision-lifted 8/20 — face untouched). She sits low so the foreground
+     foliage catches the crop line of her hem. */
+  #diana-forest-hot{position:absolute;left:24%;bottom:11%;height:52%;border:0;background:none;
+    cursor:pointer;z-index:5;padding:0}
+  #diana-forest-hot img{position:relative;left:auto;bottom:auto;transform:none;
+    height:100%;width:auto;opacity:.97;transition:filter .7s;
+    filter:drop-shadow(0 0 22px rgba(255,196,107,.28))}
+  #diana-forest-hot:hover img{filter:drop-shadow(0 0 44px rgba(255,220,150,.6)) brightness(1.04)}
+  #memory-hot{position:absolute;left:20%;top:41%;width:13svh;border:0;background:#e7dbc4;padding:5px 5px 18px;
+    cursor:pointer;transform:rotate(-6deg);box-shadow:0 6px 26px rgba(5,3,10,.55);
+    animation:polabob 9s ease-in-out infinite;z-index:5}
+  @keyframes polabob{0%,100%{transform:rotate(-6deg) translateY(0)}50%{transform:rotate(-4deg) translateY(-10px)}}
+  #memory-hot img{width:100%;display:block}
+  #leaves{position:absolute;inset:0;pointer-events:none;z-index:4}
+  .realm-title{position:absolute;left:0;right:0;top:9svh;text-align:center;pointer-events:none;z-index:6}
+  /* the big realm names are RETIRED (Diana 8/20 round 2) — the italic
+     taglines carry each scene alone: same words, same font, large and
+     carved out of the scene with a hard dark halo so they read anywhere */
+  .realm-title h2{display:none}
+  /* the quote rides on its own strip of dark glass — legible over ANY
+     backdrop, bright water and candle-fire included */
+  .realm-title p{display:inline-block;font-style:italic;color:#fff;
+    font-size:clamp(1.25rem,3.4vw,1.7rem);letter-spacing:.04em;
+    padding:.42em 1.5em;border-radius:999px;
+    background:rgba(10,5,18,.58);backdrop-filter:blur(8px);
+    -webkit-backdrop-filter:blur(8px);
+    box-shadow:0 0 30px rgba(10,5,18,.45),inset 0 0 24px rgba(138,75,255,.12);
+    text-shadow:0 1px 3px rgba(0,0,0,.9)}
+
+  /* ---------- floating memory polaroids (3 per realm, 12 total) ----------
+     each floats on its own clock, breathes a glow that says "touch me",
+     and FLIPS on click — the back is Diana's handwriting: the memory */
+  .mempol{position:absolute;border:0;background:none;padding:0;cursor:pointer;z-index:6;
+    width:13vmin;min-width:92px;perspective:800px;
+    animation:polfloat 8s ease-in-out infinite}
+  /* three sizes so the crowd of photos reads layered, not flat */
+  .mempol.s1{width:10.5vmin;min-width:76px}
+  .mempol.s2{width:9vmin;min-width:64px;filter:brightness(.93)}
+  /* READING IS A DELIBERATE ACT. The three sizes exist so the crowd of
+     photographs reads layered — but the type on a back is sized off the
+     VIEWPORT while the card is sized in vmin, so the smallest card ends up
+     with proportionally the largest text, and a 159-character memory came
+     out at 7.7px. Technically fitting; nobody could read it.
+     So a flipped card comes forward: it grows, lifts above its neighbours,
+     and stops drifting so the words hold still. Width is a LAYOUT change,
+     not a transform, which is what lets fitBack() see the extra room and
+     hand the sentence back a readable size.
+     `.mempol.mempol.flipped` is deliberate — doubling the class outruns both
+     the size rules above and the portrait/landscape overrides further down,
+     without reaching for !important on a state that has to win. */
+  .mempol.mempol.flipped{width:min(26vmin,250px);min-width:186px;
+    z-index:20;animation:none;filter:none}
+  @keyframes polfloat{0%,100%{transform:translateY(0) rotate(var(--pr,-4deg))}
+    50%{transform:translateY(-14px) rotate(calc(var(--pr,-4deg) + 2.5deg))}}
+  .mempol .flip{position:relative;display:block;width:100%;transform-style:preserve-3d;
+    transition:transform .9s cubic-bezier(.3,.7,.3,1)}
+  .mempol.flipped .flip{transform:rotateY(180deg)}
+  .mempol .face{display:block;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .mempol .front{position:relative;background:#efe6d8;padding:6% 6% 22%;
+    animation:pollure 5s ease-in-out infinite}
+  @keyframes pollure{0%,100%{box-shadow:0 12px 34px rgba(0,0,0,.6),0 0 14px rgba(255,196,107,.25)}
+    50%{box-shadow:0 12px 34px rgba(0,0,0,.6),0 0 34px rgba(255,196,107,.65)}}
+  .mempol:hover .front{animation:none;
+    box-shadow:0 12px 34px rgba(0,0,0,.6),0 0 44px rgba(255,196,107,.85)}
+  /* DIANA 8/23: "can we crop the boarders on the photos so they look more
+     like poloroids." Her photos arrive as phone shots from 0.46 to 0.80
+     tall — several are Instagram screenshots with app chrome baked into the
+     top and bottom edge. A real Polaroid's image area is SQUARE, so the
+     window is square and object-fit crops the chrome away; POL_POS (in JS)
+     slides the window per photo so nobody loses their head. The chin below
+     the image grew to 22% — that white lip is the whole tell. */
+  .mempol .front img{width:100%;aspect-ratio:1/1;object-fit:cover;
+    object-position:50% 38%;display:block;filter:saturate(.92) contrast(1.03)}
+  .mempol .back{position:absolute;inset:0;transform:rotateY(180deg);background:#efe6d8;
+    box-shadow:0 12px 34px rgba(0,0,0,.6);padding:7% 6%;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  /* --fit is set per card by fitBack() below. Diana's captions run from 17
+     to 159 characters and a back is only ~140x145, so sixteen of them
+     overflowed the cream card and spilled onto the scene. Rather than cap
+     what she is allowed to write, the handwriting gets smaller. */
+  .mempol .back h4{font-family:var(--display);font-style:italic;font-weight:400;color:#3a2c22;
+    font-size:calc(clamp(.72rem,1.6vmin,.95rem) * var(--fit,1));
+    letter-spacing:.06em;margin-bottom:.35em}
+  .mempol .back p{font-family:var(--display);font-style:italic;color:#5a4a3c;
+    font-size:calc(clamp(.62rem,1.35vmin,.8rem) * var(--fit,1));line-height:1.42}
+
+  /* ---------- ghost apparitions — goddesses pass through the drift ----------
+     never solid: they breathe up to ~a third and let go. Random photo,
+     random place, random tilt — you never know which one will find you. */
+  /* the final swoop — WebGL dolly through the sunrise temple */
+  #swoop-gl{position:fixed;inset:0;width:100%;height:100%;z-index:25;display:none;
+    opacity:1;transition:opacity .9s ease}
+  #ghosts{position:fixed;inset:0;pointer-events:none;z-index:12;overflow:hidden}
+  .ghost{position:absolute;width:36vmin;mix-blend-mode:screen;opacity:0;
+    filter:blur(3px) saturate(.85) brightness(1.05);
+    animation:ghostpass var(--gt,4.2s) ease-in-out forwards}
+  @keyframes ghostpass{
+    0%{opacity:0;transform:translate(-50%,-50%) rotate(var(--gr0,-8deg)) scale(.92)}
+    45%{opacity:var(--go,.32)}
+    60%{opacity:var(--go,.32)}
+    100%{opacity:0;transform:translate(-50%,-46%) rotate(var(--gr1,6deg)) scale(1.07)}}
+
+  /* ---------- the one clear switch for all sound ---------- */
+  #mute-btn{position:fixed;right:1.1rem;top:1.1rem;z-index:60;width:2.7rem;height:2.7rem;
+    border-radius:50%;border:1px solid rgba(239,230,255,.35);background:rgba(14,7,22,.55);
+    color:var(--moon);cursor:pointer;backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;padding:0;
+    transition:border-color .4s,color .4s}
+  #mute-btn:hover{border-color:rgba(255,196,107,.7)}
+  #mute-btn svg{width:1.25rem;height:1.25rem;fill:none;stroke:currentColor;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round}
+  #mute-btn .off-ic{display:none}
+  #mute-btn.muted{color:var(--moon-dim)}
+  #mute-btn.muted .on-ic{display:none}
+  #mute-btn.muted .off-ic{display:block}
+
+  /* ---------- the way back (2026-08-21) ----------
+     Testers could get IN but not back OUT: the forest had no backward exit
+     at all, and nothing on screen ever said "you can go back". This cluster
+     mirrors the mute switch on the opposite corner - a step-back chevron
+     and a door that always returns to the two-door beginning. */
+  #nav-hud{position:fixed;left:1.1rem;top:1.1rem;z-index:60;display:flex;gap:.55rem;
+    opacity:0;pointer-events:none;transition:opacity .6s ease}
+  #nav-hud.on{opacity:1;pointer-events:auto}
+  .hud-btn{width:2.7rem;height:2.7rem;border-radius:50%;position:relative;
+    border:1px solid rgba(239,230,255,.35);background:rgba(14,7,22,.55);
+    color:var(--moon);cursor:pointer;backdrop-filter:blur(6px);
+    display:flex;align-items:center;justify-content:center;padding:0;
+    transition:border-color .4s,color .4s,transform .4s}
+  .hud-btn:hover{border-color:rgba(255,196,107,.7);color:var(--amber);transform:scale(1.06)}
+  .hud-btn svg{width:1.3rem;height:1.3rem;fill:none;stroke:currentColor;stroke-width:1.7;
+    stroke-linecap:round;stroke-linejoin:round}
+  /* the labels reveal themselves once, the first time the cluster appears -
+     phones have no hover, so the affordance can't live in hover alone */
+  .hud-btn::after{content:attr(data-tip);position:absolute;top:3.15rem;left:50%;
+    transform:translateX(-50%);font-family:var(--ui);font-size:.5rem;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--moon-dim);white-space:nowrap;opacity:0;
+    /* its own dark pill, so the label stays legible on the temple's sunrise
+       as well as on the night realms */
+    background:rgba(14,7,22,.62);padding:.28em .6em;border-radius:999px;
+    backdrop-filter:blur(4px);transition:opacity .5s;pointer-events:none}
+  .hud-btn:hover::after,#nav-hud.tips .hud-btn::after{opacity:.9}
+  /* the door reads amber so it never looks like a "close" button */
+  #home-btn{color:var(--amber);border-color:rgba(255,196,107,.42)}
+  @media (orientation:portrait){
+    #nav-hud{left:.8rem;top:.8rem;gap:.5rem}
+    .hud-btn{width:2.9rem;height:2.9rem}   /* thumb-sized on phones */
+  }
+
+  /* ---------- the shore (sea v3, 2026-08-20) ---------- */
+  /* Base and Diana are the SAME full-frame 16:9 plate under identical cover
+     sizing, so she stays welded to her spot in the sand at every aspect
+     ratio — no per-breakpoint placement, nothing to re-tune. */
+  #ch-sea{background:#2a1608}
+  #SH-base img,#SH-diana img{left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);
+    width:104%;height:104%;object-fit:cover;object-position:50% 50%}
+  #sea-gl{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:104%;height:104%;display:none}
+  #sea-gl.on{display:block}
+  #sea-gl.on + #sea-fallback{display:none}
+  /* she is painted full-frame and never catches the pointer herself; the hit
+     test lives in JS against her real alpha box (see shoreHit) */
+  #SH-diana{z-index:5}
+  #SH-diana img{pointer-events:none;transition:filter .6s ease;
+    animation:shorebob 9.5s ease-in-out infinite}
+  @keyframes shorebob{0%,100%{transform:translate(-50%,-50%)}
+    50%{transform:translate(-50%,calc(-50% - 6px))}}
+  #ch-sea.diana-hot #SH-diana img{filter:drop-shadow(0 0 26px rgba(255,214,150,.55))}
+  #ch-sea.diana-hot{cursor:pointer}
+
+  /* The surf is the photograph's own foam, lifted by differencing the master
+     against the empty sand — so it lands in perfect perspective and scale.
+     It carries a Diana-shaped hole, which she fills exactly, so this plate
+     stays PUT behind her. The wash below her contact line has no hole, so
+     that band is the one that slides: fast rush up the beach, slow drain
+     back. The timing is the whole illusion. */
+  #SH-surf img{left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);
+    width:104%;height:104%;object-fit:cover;object-position:50% 50%}
+  #SH-wash img{width:112%;bottom:-7svh;will-change:transform,opacity;
+    animation:wash 10.5s infinite}
+  @keyframes wash{
+    0%{transform:translateX(-50%) translateY(8.5svh) scaleY(1);opacity:.62;
+       animation-timing-function:cubic-bezier(.12,.9,.3,1)}
+    23%{transform:translateX(-50%) translateY(-3svh) scaleY(1.06);opacity:1;
+       animation-timing-function:cubic-bezier(.5,0,.75,.38)}
+    100%{transform:translateX(-50%) translateY(8.5svh) scaleY(1);opacity:.62}}
+  @media (orientation:portrait){#SH-wash img{width:126%;bottom:-5svh}}
+  @media (prefers-reduced-motion:reduce){
+    #SH-wash img,#SH-diana img{animation:none}}
+  /* the shore's own light does this now (shader glimmer + sparkle); the old
+     screen-blended band left a hard horizontal edge across the beach */
+  #ch-sea .realm-title{top:4.5svh;padding:0 1.1rem}
+  /* the record — pure CSS vinyl, spinning slow above the water. Click:
+     record scratch + the music room. */
+  #record-hot{position:absolute;left:14%;top:34%;width:12vmin;min-width:88px;aspect-ratio:1;
+    border:0;background:none;padding:0;cursor:pointer;z-index:6;
+    animation:polfloat 9.5s ease-in-out infinite}
+  #record-hot .disc{position:absolute;inset:0;border-radius:50%;
+    background:repeating-radial-gradient(circle at 50% 50%,
+      #0b0b0e 0 1.5px,#17171c 1.5px 3px);
+    box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 18px rgba(138,75,255,.35),
+      inset 0 0 12px rgba(0,0,0,.8);
+    animation:recspin 4.5s linear infinite,reclure 5.5s ease-in-out infinite}
+  @keyframes recspin{to{transform:rotate(360deg)}}
+  @keyframes reclure{0%,100%{box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 14px rgba(138,75,255,.3),inset 0 0 12px rgba(0,0,0,.8)}
+    50%{box-shadow:0 10px 30px rgba(0,0,0,.55),0 0 34px rgba(138,75,255,.65),inset 0 0 12px rgba(0,0,0,.8)}}
+  #record-hot:hover .disc{animation-duration:1.2s,5.5s;
+    box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 44px rgba(138,75,255,.85),inset 0 0 12px rgba(0,0,0,.8)}
+  #record-hot .rlabel{position:absolute;left:50%;top:50%;width:34%;height:34%;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle,#0e0716 0 12%,#ff4fa3 13%,#8a4bff 85%);
+    box-shadow:0 0 8px rgba(0,0,0,.6)}
+
+  /* ---------- the funhouse ---------- */
+  #ch-funhouse{background:#0a0512}
+  #F-base img{width:max(105vw,251svh);bottom:-2.5svh}
+  .fly.p{background:#ff9fd0;box-shadow:0 0 9px 3px rgba(255,79,163,.45)}
+  /* the mirrors HANG in the corridor (Diana 8/20) — every one drops on its
+     own cord from the dark above, face-on, and sways on its own clock.
+     --mh is the mirror's share of the button; the cord takes the rest. */
+  .mirror-hot{position:absolute;top:-2%;border:0;background:none;cursor:pointer;z-index:5;padding:0;
+    transform-origin:top center;animation:mirrorsway 8s ease-in-out infinite;
+    pointer-events:none} /* only the mirror IMAGE takes the pointer — the
+    button's tall cord rectangle must never swallow the phone/doll below */
+  @keyframes mirrorsway{0%,100%{transform:rotate(1.6deg)}50%{transform:rotate(-1.6deg)}}
+  .mirror-hot .mcord{position:absolute;left:50%;top:0;width:2px;height:calc(100% - var(--mh));
+    background:linear-gradient(rgba(20,10,26,.9),#3a2a44)}
+  .mirror-hot img{position:absolute;left:50%;bottom:0;transform:translateX(-50%);
+    height:var(--mh);width:auto;transition:filter .6s;z-index:2;pointer-events:auto;
+    filter:drop-shadow(0 0 14px rgba(138,75,255,.3)) brightness(1.05) saturate(1.05);
+    animation:mirrorlure 5.5s ease-in-out infinite}
+  @keyframes mirrorlure{0%,100%{filter:drop-shadow(0 0 12px rgba(138,75,255,.25)) brightness(1.05) saturate(1.05)}
+    50%{filter:drop-shadow(0 0 28px rgba(138,75,255,.55)) brightness(1.05) saturate(1.05)}}
+  .mirror-hot:hover img{animation:none;
+    filter:drop-shadow(0 0 34px rgba(138,75,255,.75)) brightness(1.1) saturate(1.05)}
+  #mir-tall{left:5%;height:74%;width:22%;--mh:56%}
+  #mir-oval{left:26%;height:48%;width:22%;--mh:38%;animation-delay:-2.6s;animation-duration:9.5s}
+  #mir-roses{right:4%;height:54%;width:24%;--mh:36%;animation-delay:-3.8s;animation-duration:8.8s}
+  /* ---- the living glass: a Diana ghost behind every pane; hover and she
+     bursts into purple smoke, then a DIFFERENT Diana settles in ---- */
+  .mghost{position:absolute;object-fit:cover;pointer-events:none;z-index:1;
+    mix-blend-mode:screen;opacity:.55;
+    filter:blur(1px) saturate(.65) brightness(1.12) contrast(.95);
+    transition:opacity .6s ease,filter .6s ease;
+    animation:ghostbreathe 6s ease-in-out infinite}
+  /* hanging mirrors: ghost + smoke anchor to the mirror IMAGE's own box —
+     centered like the image, sized as fractions of --mh, shaped to the pane */
+  .mirror-hot .mghost,.mirror-hot .smokepuff{left:50%;transform:translateX(-50%)}
+  #mir-tall .mghost,#mir-tall .smokepuff{bottom:calc(0.175*var(--mh));
+    height:calc(0.65*var(--mh));aspect-ratio:.30;border-radius:8%/4%}
+  #mir-oval .mghost,#mir-oval .smokepuff{bottom:calc(0.30*var(--mh));
+    height:calc(0.46*var(--mh));aspect-ratio:2.0;border-radius:50%}
+  #mir-roses .mghost,#mir-roses .smokepuff{bottom:calc(0.335*var(--mh));
+    height:calc(0.43*var(--mh));aspect-ratio:1.9;border-radius:50%}
+  @keyframes ghostbreathe{0%,100%{opacity:.4}50%{opacity:.6}}
+  .mghost.out{animation:none;opacity:0;
+    filter:blur(16px) saturate(.2) brightness(1.9) hue-rotate(250deg);
+    transition:opacity .5s ease,filter .5s ease}
+  .smokepuff{position:absolute;pointer-events:none;z-index:3;opacity:0;
+    background:radial-gradient(circle at 35% 62%,rgba(178,120,255,.9) 0%,rgba(138,75,255,.5) 35%,rgba(80,40,160,0) 70%),
+      radial-gradient(circle at 65% 30%,rgba(205,155,255,.75) 0%,rgba(138,75,255,0) 60%);
+    filter:blur(9px);mix-blend-mode:screen}
+  .smokepuff.go{animation:puff 1.15s ease-out both}
+  @keyframes puff{0%{opacity:0;transform:scale(.55) translateY(8%)}
+    28%{opacity:.95}100%{opacity:0;transform:scale(1.75) translateY(-26%)}}
+  /* the two mirrors painted into the corridor: their panes become buttons,
+     anchored to F-base's own geometry (same width formula, same bottom),
+     so the glass stays welded to the painting at every aspect ratio */
+  .bmirror{position:absolute;border:0;background:none;padding:0;cursor:pointer;z-index:4;
+    overflow:hidden;--FW:max(105vw,251svh);--FH:calc(max(105vw,251svh)*0.42432)}
+  #mg-stand{left:calc(50% - 0.211*var(--FW));width:calc(0.064*var(--FW));
+    bottom:calc(-2.5svh + 0.256*var(--FH));height:calc(0.438*var(--FH));
+    border-radius:10% / 6%}
+  #mg-hall{left:calc(50% + 0.046*var(--FW));width:calc(0.0265*var(--FW));
+    bottom:calc(-2.5svh + 0.313*var(--FH));height:calc(0.230*var(--FH));
+    border-radius:14% / 7%}
+  .bmirror .mghost,.bmirror .smokepuff{inset:0;width:100%;height:100%;border-radius:inherit}
+  /* the television: a static-snow canvas glows through its dead screen */
+  #tv-hot{position:absolute;right:30%;bottom:11%;height:24%;border:0;background:none;
+    cursor:pointer;z-index:6;padding:0}
+  #tv-hot img{position:relative;z-index:2;height:100%;width:auto;transition:filter .6s;
+    filter:drop-shadow(0 0 16px rgba(180,200,255,.22))}
+  #tv-hot:hover img{filter:drop-shadow(0 0 30px rgba(190,210,255,.45))}
+  /* the snow sits OVER the dark glass and blends up out of it */
+  #tv-static{position:absolute;z-index:3;left:15%;top:34%;width:66%;height:39%;
+    border-radius:10% / 14%;opacity:.38;mix-blend-mode:screen;pointer-events:none}
+  #tv-hot:hover #tv-static{opacity:.55}
+  #phone-hot{position:absolute;left:26%;bottom:10%;height:13%;border:0;background:none;
+    cursor:pointer;z-index:5;padding:0}
+  /* position:relative (not the .layer img absolute default) so the button
+     shrink-wraps its image and actually has a clickable area — the zero-
+     width-button bug Diana kept hitting on the phone and doll */
+  #phone-hot img{position:relative;left:auto;bottom:auto;transform:none;
+    height:100%;width:auto;transition:filter .6s,transform .6s;
+    filter:drop-shadow(0 0 14px rgba(255,79,163,.25))}
+  #phone-hot:hover img{filter:drop-shadow(0 0 30px rgba(255,79,163,.55));
+    animation:phonering .4s ease-in-out infinite}
+  @keyframes phonering{0%,100%{transform:rotate(0)}30%{transform:rotate(-1.6deg)}70%{transform:rotate(1.4deg)}}
+  /* she stands alone on the corridor floor, well clear of the TV, so she
+     reads as her own clickable thing */
+  #doll-hot{position:absolute;left:47%;bottom:10%;height:15%;border:0;background:none;
+    cursor:pointer;z-index:5;padding:0}
+  #doll-hot img{position:relative;left:auto;bottom:auto;transform:none;
+    height:100%;width:auto;opacity:.92;transition:filter .6s;
+    filter:drop-shadow(0 0 12px rgba(138,75,255,.3))}
+  #doll-hot:hover img{filter:drop-shadow(0 0 26px rgba(255,79,163,.5))}
+
+  /* ---------- the temple ---------- */
+  #ch-temple{background:#0b0810}
+  #T-base img,#T-dawn img{left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);
+    width:104%;height:104%;object-fit:cover;object-position:50% 50%}
+  #T-dawn{opacity:0;transition:opacity 6s ease}
+  #ch-temple.dawn #T-dawn{opacity:1}
+  /* the giant candle is the photograph's own candle cluster, lifted onto its
+     own plate (tools: Vision lift from matte-temple). Cover sizing and
+     parallax depths MATCH T-base exactly, so it stays welded over its own
+     pixels; the pointer finds it through an alpha hit test (candleHit). */
+  /* flicker is BRIGHTNESS only — the old drop-shadow halo outlined the
+     whole wax silhouette and read as weird light on the left melt */
+  #T-candle img{left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);
+    width:104%;height:104%;object-fit:cover;object-position:50% 50%;
+    animation:candleflicker 3.4s ease-in-out infinite}
+  #ch-temple.candle-hot{cursor:pointer}
+  #ch-temple.candle-hot #T-candle img{animation:none;filter:brightness(1.08)}
+  @keyframes candleflicker{0%,100%{filter:brightness(1)}
+    23%{filter:brightness(1.045)}41%{filter:brightness(.975)}
+    68%{filter:brightness(1.06)}}
+  /* the bookshelf leans back against the vined pillar; disturb it and a few
+     books fly out, then float there, glowing, waiting to be opened */
+  /* the shelf leans against one of the FURTHER pillars, midway down the
+     left colonnade — smaller, deeper in the scene (the art carries its
+     own lean) */
+  #shelf-hot{position:absolute;left:26%;bottom:29%;height:22%;border:0;background:none;
+    cursor:pointer;z-index:5;padding:0}
+  #shelf-hot img{position:relative;left:auto;bottom:auto;transform:none;
+    height:100%;width:auto;transition:filter .6s;
+    filter:drop-shadow(0 0 16px rgba(255,196,107,.3)) drop-shadow(0 10px 22px rgba(0,0,0,.6))}
+  #shelf-hot:hover img{filter:drop-shadow(0 0 32px rgba(255,196,107,.6)) drop-shadow(0 10px 22px rgba(0,0,0,.55))}
+  /* shelfmode: the books wait inside the shelf… */
+  #ch-temple.shelfmode .book-hot{opacity:0;pointer-events:none;
+    left:28%;right:auto;bottom:32%;transform:scale(.3) rotate(-20deg);
+    transition:left 1.3s cubic-bezier(.2,.75,.3,1.05),bottom 1.3s cubic-bezier(.2,.75,.3,1.05),
+      opacity .6s ease,transform 1.3s cubic-bezier(.2,.75,.3,1.05)}
+  /* …then fly out and STAY, floating and glowing (clickable) */
+  /* z-index 7 (the shelf is 5): a book that has FLOWN OUT of the shelf is in
+     front of it, and the shelf's own 22%-tall box otherwise covers both
+     landing spots — which would make Diana's two book asks (the bio in the
+     black book, her photographs in the red one) unclickable. Layering, not
+     decoration. */
+  #ch-temple.shelfmode.books-out .book-hot{opacity:1;pointer-events:auto;
+    transform:scale(1) rotate(0);z-index:7}
+  #ch-temple.shelfmode.books-out #book-navy{left:24%;bottom:44%}
+  #ch-temple.shelfmode.books-out #book-red{left:44%;bottom:56%}
+  #ch-temple.shelfmode.books-out .book-hot img{animation:bookfloat 7s ease-in-out infinite}
+  #ch-temple.shelfmode.books-out #book-red img{animation-delay:-3.2s}
+  @keyframes bookfloat{0%,100%{transform:translateY(0);
+      filter:drop-shadow(0 0 18px rgba(255,196,107,.5)) drop-shadow(0 8px 18px rgba(0,0,0,.55))}
+    50%{transform:translateY(-12px);
+      filter:drop-shadow(0 0 34px rgba(255,196,107,.85)) drop-shadow(0 8px 18px rgba(0,0,0,.5))}}
+  #T-pillars img{position:absolute;bottom:auto}
+  #T-pillars .pl-vines{left:-3.5%;top:-6%;height:112%;width:auto;transform:none}
+  #T-pillars .pl-broken{right:20%;left:auto;bottom:14%;top:auto;height:34%;width:auto;transform:none;
+    filter:brightness(.85)}
+  #T-pillars .pl-intact{right:-4%;left:auto;top:-8%;height:116%;width:auto;transform:none}
+  .book-hot{position:absolute;border:0;background:none;cursor:pointer;z-index:5;padding:0}
+  /* position:relative (not the .layer img absolute default at ~line 156) so
+     the BUTTON takes its width from the book — absolute images leave it 0px
+     wide, which left a degenerate hit target: the books rendered perfectly
+     and could not be clicked. Same trap, same fix, as #shelf-hot above.
+     PRE-EXISTING, found 8/24 while wiring Diana's two books. */
+  .book-hot img{position:relative;left:auto;bottom:auto;transform:none;
+    pointer-events:auto;height:100%;width:auto;transition:filter .6s;
+    filter:drop-shadow(0 0 16px rgba(255,196,107,.35)) drop-shadow(0 8px 18px rgba(0,0,0,.55))}
+  .book-hot:hover img{filter:drop-shadow(0 0 34px rgba(255,196,107,.75)) drop-shadow(0 8px 18px rgba(0,0,0,.5))}
+  /* fallback floor positions — used only if bookshelf.webp is missing
+     (book-red sits at right:44% so it stays clear of the giant candle's wax) */
+  #book-navy{left:20%;bottom:5%;height:19%}
+  #book-red{right:44%;bottom:6%;height:17%}
+  #ch-temple .realm-title p:last-child{transition:opacity 3s ease}
+  #ch-temple.dawn #temple-night-line{display:none}
+  #ch-temple.dawn .realm-title h2{color:#43304e;text-shadow:0 0 26px rgba(255,244,230,.8),0 0 60px rgba(255,220,180,.5)}
+  #ch-temple.dawn .realm-title p{color:#fdf6ea}
+  #temple-dawn-line{display:none}
+  #ch-temple.dawn #temple-dawn-line{display:inline-block}
+
+
+  /* ---------- transition textures: each boundary gets its own light ---------- */
+  #fx{position:fixed;inset:0;pointer-events:none;z-index:20}
+  #fx>div{position:absolute;inset:0;opacity:0}
+  /* blinding sunlight + sparkles (into the forest) */
+  #fx-sun{mix-blend-mode:screen;transform-origin:28% 24%;transform:scale(var(--fs,1));
+    background:radial-gradient(60% 55% at 28% 24%,rgba(255,255,255,.96) 0%,rgba(255,238,190,.78) 22%,rgba(255,196,107,.3) 46%,rgba(255,196,107,0) 68%)}
+  #fx-sun i{position:absolute;width:6px;height:6px;background:#fff;border-radius:50%;
+    box-shadow:0 0 12px 4px rgba(255,244,214,.9),0 0 30px 9px rgba(255,214,140,.5);
+    animation:twk 1.3s ease-in-out infinite}
+  #fx-sun i::before,#fx-sun i::after{content:'';position:absolute;left:50%;top:50%;
+    width:44px;height:2px;transform:translate(-50%,-50%);
+    background:linear-gradient(90deg,transparent,rgba(255,250,230,.9),transparent)}
+  #fx-sun i::after{transform:translate(-50%,-50%) rotate(90deg)}
+  @keyframes twk{0%,100%{opacity:.15;scale:.55}50%{opacity:1;scale:1.2}}
+  /* purpleish spotlight (out of the sea, toward the funhouse) */
+  #fx-spot{mix-blend-mode:screen;
+    background:radial-gradient(42% 62% at calc(50% + var(--sx,0vw)) 46%,rgba(205,155,255,.9) 0%,rgba(138,75,255,.55) 34%,rgba(80,40,160,.2) 58%,rgba(80,40,160,0) 74%)}
+  /* smoke (ready for funhouse -> temple) */
+  #fx-smoke{mix-blend-mode:screen;filter:blur(14px);opacity:0;
+    background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size:140vmax 140vmax;animation:smokedrift 26s linear infinite}
+  @keyframes smokedrift{from{background-position:0 0}to{background-position:140vmax 60vmax}}
+  #fx-sun.go{animation:fxbell 1.7s ease both}
+  #fx-spot.go{animation:fxbell 2s ease both}
+  #fx-smoke.go{animation:smokedrift 26s linear infinite,fxbell 2.6s ease both}
+  @keyframes fxbell{0%{opacity:0}30%{opacity:1}100%{opacity:0}}
+  /* ---------- shared chrome ---------- */
+  #veil{position:fixed;inset:0;z-index:40;pointer-events:none;opacity:0;overflow:hidden;
+    --gx:24%;--gy:16%;transition:opacity .8s ease}
+  #veil.on{opacity:1}
+  #veil .glow{position:absolute;left:var(--gx);top:var(--gy);width:175vmax;height:175vmax;border-radius:50%;
+    transform:translate(-50%,-50%) scale(.1);transition:transform 1.05s cubic-bezier(.3,.65,.3,1);
+    background:radial-gradient(circle,#fff3da 0%,rgba(255,208,130,.97) 26%,rgba(255,150,110,.82) 48%,rgba(138,75,255,.3) 66%,rgba(14,7,22,0) 75%)}
+  #veil.on .glow{transform:translate(-50%,-50%) scale(1.3)}
+  #veil[data-realm="door"]{--gx:50%;--gy:56%}
+  #veil[data-realm="door"] .glow{background:radial-gradient(circle,#fff0d4 0%,rgba(255,196,107,.92) 24%,rgba(255,140,80,.5) 48%,rgba(20,10,28,.3) 66%,rgba(10,5,18,0) 75%)}
+  #veil[data-realm="sea"]{--gx:13%;--gy:40%}
+  #veil[data-realm="sea"] .glow{background:radial-gradient(circle,#ffe9cf 0%,rgba(255,182,122,.96) 24%,rgba(130,170,225,.62) 50%,rgba(24,44,84,.3) 66%,rgba(10,16,32,0) 75%)}
+  #veil[data-realm="funhouse"]{--gx:50%;--gy:52%}
+  #veil[data-realm="funhouse"] .glow{background:radial-gradient(circle,#e8d7ff 0%,rgba(178,120,255,.9) 26%,rgba(138,75,255,.6) 48%,rgba(255,79,163,.25) 66%,rgba(10,5,18,0) 75%)}
+  #veil[data-realm="temple"]{--gx:50%;--gy:70%}
+  #veil[data-realm="temple"] .glow{background:radial-gradient(circle,#fff0d4 0%,rgba(255,196,107,.95) 26%,rgba(255,160,90,.6) 50%,rgba(26,30,51,.3) 66%,rgba(11,8,16,0) 75%)}
+  #scrollcue{position:fixed;left:0;right:0;bottom:3.4svh;text-align:center;z-index:8;font-family:var(--ui);
+    font-size:.6rem;letter-spacing:.3em;text-transform:uppercase;color:var(--moon-dim);opacity:0;
+    /* the cue now names BOTH directions, so it has to survive the bright
+       realms (the shore's sunset, the temple's dawn) as well as the night */
+    text-shadow:0 1px 8px rgba(0,0,0,.9),0 0 22px rgba(0,0,0,.6);
+    transition:opacity 1.2s;pointer-events:none}
+  #scrollcue.on{opacity:.8}
+  /* ---------- mobile (portrait): smaller floaters, clear titles ----------
+     everything here is portrait-only — the desktop layout is untouched */
+  @media (orientation:portrait){
+    .mempol{width:20vw;min-width:0}
+    .mempol.s1{width:17vw;min-width:0}
+    .mempol.s2{width:15vw;min-width:0}
+    /* the pill clears the mute button and the screen edges */
+    .realm-title{top:8.5svh!important;padding:0 1rem}
+    .realm-title p{max-width:80vw}
+    #record-hot{width:16vw;min-width:0;left:7%;top:48%}
+    .ghost{width:52vw}
+    .pol{width:20vw}
+    .realm-title p{font-size:1.02rem;padding:.42em 1em;max-width:92vw}
+    #diana-forest-hot{height:38%;left:16%;bottom:17%}
+    #mir-tall{--mh:46%;width:30%;left:2%}
+    #mir-oval{--mh:26%;left:31%}
+    #mir-roses{--mh:24%}
+    /* spread the funhouse floor: phone left, doll centre, tv right */
+    #phone-hot{left:5%;height:10%}
+    #doll-hot{left:38%;bottom:9%;height:13%}
+    #tv-hot{right:5%;height:15%;bottom:12%}
+    /* temple: pan the welded plates toward the candle side and slim the
+       foreground pillars to edge framing */
+    #T-base img,#T-dawn img,#T-candle img{object-position:68% 50%}
+    #T-pillars .pl-intact{height:82%;right:-26%}
+    #T-pillars .pl-vines{height:82%;left:-24%}
+    #shelf-hot{height:16%;left:10%;bottom:22%}
+    .choice-label .pfont{font-size:1.1rem}
+  }
+  /* ---------- mobile LANDSCAPE (short screens): keep floaters modest ---- */
+  @media (orientation:landscape) and (max-height:520px){
+    .mempol{min-width:0;width:24vmin}
+    .mempol.s1{min-width:0;width:20vmin}
+    .mempol.s2{min-width:0;width:17vmin}
+    #record-hot{min-width:0;width:16vmin}
+    .realm-title p{font-size:1.05rem;padding:.38em 1.1em;max-width:78vw}
+    #roomcard{padding:1.5rem 1.6rem}
+    #roomcard p{margin-bottom:1rem}
+  }
+  /* the room card scrolls instead of clipping on short screens
+     (margin:auto keeps it centered whenever it fits) */
+  #room{position:fixed;inset:0;z-index:30;display:none;align-items:flex-start;justify-content:center;
+    background:rgba(10,5,18,.88);backdrop-filter:blur(14px);padding:6vw;overflow-y:auto}
+  #room.open{display:flex}
+  #roomcard{margin:auto}
+  #roomcard{max-width:32rem;width:100%;text-align:center;border:1px solid rgba(180,120,255,.4);
+    border-radius:24px;padding:3.4rem 2.4rem;background:linear-gradient(180deg,rgba(20,10,30,.94),rgba(14,7,22,.97));
+    box-shadow:0 0 60px rgba(138,75,255,.55),0 0 150px rgba(138,75,255,.35)}
+  #roomcard h3{font-style:italic;font-weight:400;font-size:clamp(1.2rem,4.6vw,1.8rem);letter-spacing:.3em;
+    text-transform:uppercase;margin-bottom:1.1rem;
+    text-shadow:0 0 26px rgba(255,196,107,.55),0 0 70px rgba(138,75,255,.5)}
+  #roomcard p{color:var(--moon-dim);line-height:1.8;margin-bottom:1.5rem;font-size:.98rem}
+  .room-cta{display:block;margin:1.2rem auto 0;width:fit-content;font-family:var(--ui);
+    font-size:.68rem;letter-spacing:.24em;text-transform:uppercase;color:var(--amber);
+    text-decoration:none;border:1px solid rgba(255,196,107,.45);border-radius:999px;
+    padding:.85em 1.9em;box-shadow:0 0 22px rgba(255,196,107,.3);
+    background:none;cursor:pointer}
+  .room-cta:hover{color:#ffe2b0;border-color:rgba(255,196,107,.8);
+    box-shadow:0 0 34px rgba(255,196,107,.55)}
+  /* ---- wide rooms: the television, the reel, the photographs ---- */
+  #roomcard.wide{max-width:min(94vw,58rem)}
+  .tvwrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;
+    box-shadow:0 0 40px rgba(138,75,255,.35);background:#000}
+  .tvwrap iframe{position:absolute;inset:0;width:100%;height:100%}
+  .tvtitle{font-style:italic;margin-top:1rem}
+  .ytgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .ytthumb{position:relative;border:0;padding:0;cursor:pointer;border-radius:12px;
+    overflow:hidden;background:#000;aspect-ratio:16/9}
+  .ytthumb img{width:100%;height:100%;object-fit:cover;opacity:.85;transition:opacity .3s}
+  .ytthumb:hover img{opacity:1}
+  .ytthumb .ytplay{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    color:#fff;font-size:2rem;text-shadow:0 0 18px rgba(0,0,0,.9);pointer-events:none}
+  .ytthumb .ytt{position:absolute;left:0;right:0;bottom:0;padding:.5em .7em;
+    font-family:var(--ui);font-size:.6rem;letter-spacing:.12em;text-transform:uppercase;
+    color:#fff;text-align:left;background:linear-gradient(transparent,rgba(0,0,0,.85))}
+  .tvwrap.ingrid{aspect-ratio:16/9}
+  /* the album: two photographs to a spread, on album card, captions under.
+     grid-template-columns collapses to one column on a phone so a spread is
+     never two postage stamps. */
+  /* the doll's two selves, breathing into each other */
+  .dollfade{position:relative;width:min(20rem,74%);margin:0 auto 1.4rem;
+    aspect-ratio:3/4;box-shadow:0 12px 34px rgba(0,0,0,.6)}
+  .dollfade img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+  /* THEN is the still base and NOW crossfades over it. The old version
+     animated BOTH on one symmetric curve with `reverse`, which forced the two
+     halves to be mirror images — 50/50, and no way to let one linger longer
+     without opening a gap where neither is opaque and the black plate shows
+     through. One animated layer over a static one has no such gap, and lets
+     the timing be lopsided on purpose.
+     LAUREN 8/24: the before should "fade a little faster into the after."
+     So the before holds ~2.4s, crossfades in ~1.2s, and the after — the one
+     she is now — holds ~5.5s. */
+  .dollfade .d-now{animation:dollswap 11s ease-in-out infinite}
+  @keyframes dollswap{0%,22%{opacity:0}33%,83%{opacity:1}94%,100%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){
+    .dollfade .d-now{animation-duration:22s}}
+  .doll-line{font-style:italic;line-height:1.9!important}
+  .poem{font-style:italic;font-size:1.06rem!important;line-height:1.95!important;
+    color:var(--moon)!important}
+  .poem-by{font-family:var(--ui);letter-spacing:.2em;font-size:.72rem!important;
+    color:var(--moon-dim)!important;margin-bottom:1.4rem!important}
+  .album{display:flex;flex-direction:column;gap:1.1rem}
+  .aspread{display:grid;grid-template-columns:repeat(2,1fr);gap:1.1rem}
+  .apage{background:#efe6d8;padding:5% 5% 4%;box-shadow:0 10px 30px rgba(0,0,0,.55);
+    display:flex;flex-direction:column;gap:.7rem}
+  .apage img{width:100%;aspect-ratio:1/1;object-fit:cover;display:block;
+    filter:saturate(.92) contrast(1.03)}
+  .apage figcaption{font-family:var(--display);font-style:italic;color:#5a4a3c;
+    font-size:.86rem;line-height:1.5;text-align:center}
+  .anav{display:flex;align-items:center;justify-content:center;gap:1.2rem;flex-wrap:wrap}
+  .anav .room-cta{margin:0}
+  .anav .room-cta:disabled{opacity:.32;cursor:default;border-color:rgba(255,196,107,.2)}
+  .anum{font-family:var(--ui);letter-spacing:.24em;font-size:.76rem;color:var(--moon-dim)}
+  @media (max-width:640px){.aspread{grid-template-columns:1fr}}
+  /* the room is WIDE now (it carries video), but prose at 58rem is
+     unreadable — the bio keeps its own measure and stays centred. */
+  .biobody{max-width:34rem;margin:0 auto}
+  /* 130px, not 160: the room's inner width on a 430px phone is ~300px, and
+     160 forced a SINGLE column — five clips became a very long scroll.
+     130 gives phones two across and desktop still fills out. */
+  .clipgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+    gap:12px;margin-bottom:1.6rem}
+  .clip{position:relative;border:0;padding:0;background:#0b0810;cursor:pointer;
+    overflow:hidden;border-radius:3px;box-shadow:0 8px 22px rgba(0,0,0,.55);
+    transition:transform .35s ease,box-shadow .35s ease}
+  .clip:hover,.clip:focus-visible{transform:translateY(-3px);
+    box-shadow:0 12px 30px rgba(0,0,0,.6),0 0 26px rgba(255,196,107,.45)}
+  .clip img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block;
+    filter:brightness(.82) saturate(.95);transition:filter .35s ease}
+  .clip:hover img{filter:brightness(1) saturate(1)}
+  .clipplay{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);
+    font-size:1.5rem;color:#fff;text-shadow:0 2px 14px rgba(0,0,0,.85);pointer-events:none}
+  .clipt{position:absolute;left:0;right:0;bottom:0;padding:.5em .6em;
+    font-family:var(--ui);font-size:.66rem;letter-spacing:.1em;line-height:1.35;
+    color:#f3ecff;text-align:left;pointer-events:none;
+    background:linear-gradient(transparent,rgba(0,0,0,.86))}
+  .clipwrap{background:#000;border-radius:3px;overflow:hidden;
+    box-shadow:0 10px 28px rgba(0,0,0,.6)}
+  .clipwrap video{width:100%;max-height:70svh;display:block;background:#000}
+  /* her own files on the television: same frame the YouTube embed gets, but
+     a <video> has intrinsic size so it needs the height cap itself */
+  .tvwrap.own{background:#000}
+  .tvwrap.own video,.tvwrap.ingrid video{width:100%;max-height:66svh;display:block;background:#000}
+  .bio-head{font-family:var(--ui);letter-spacing:.28em;text-transform:lowercase;
+    font-size:.72rem;color:var(--amber);margin-bottom:.5rem!important}
+  .bio-venues{font-style:italic;color:var(--moon-dim)}
+  .phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+  .phgrid img{width:100%;aspect-ratio:3/4;object-fit:cover;object-position:50% 22%;
+    border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+  .linkcol{display:flex;flex-direction:column;align-items:center;gap:.4rem}
+  /* ---- socials at the foot of the business page ---- */
+  #social-row{display:flex;justify-content:center;flex-wrap:wrap;gap:1.4rem;margin-top:2.2rem}
+  #social-row a{font-family:var(--ui);font-size:.62rem;letter-spacing:.28em;
+    text-transform:uppercase;color:var(--moon-dim);text-decoration:none;
+    transition:color .35s}
+  #social-row a:hover{color:var(--amber)}
+  #ch-index.dawnend #social-row a{color:#5d4054;text-shadow:0 1px 0 rgba(255,250,240,.5)}
+  #ch-index.dawnend #social-row a:hover{color:#8a4bff}
+  #close{background:none;border:1px solid rgba(239,230,255,.3);color:var(--moon);font-family:var(--ui);
+    font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;padding:.8em 2.2em;cursor:pointer;
+    border-radius:999px;box-shadow:0 0 20px rgba(138,75,255,.35)}
+</style></head><body>
+<div id="stage">
+
+  <!-- 0 · the smoke title -->
+  <section class="chapter on" id="ch-title" role="button" aria-label="Welcome to Dianaland">
+    <img src="assets/intro-title.webp" alt="Welcome to Dianaland, written in smoke">
+  </section>
+
+  <!-- 1 · the choice -->
+  <section class="chapter" id="ch-choice">
+    <button class="choice-btn" id="choose-door" aria-label="Here for pleasure — take the red door into Dianaland">
+      <img src="assets/intro-door-alpha.webp" alt="A red door wreathed in golden smoke">
+      <span class="choice-label"><em class="pfont">pleasure</em> · enter dianaland</span>
+    </button>
+    <button class="choice-btn" id="choose-easy" aria-label="Here on business — the direct way to shows, music and booking">
+      <img src="assets/intro-easy.webp" alt="A big red easy button">
+      <span class="choice-label"><em class="pfont">business</em> · shows, music &amp; booking</span>
+    </button>
+  </section>
+
+  <!-- 1.5 · the walk through the door (scroll to move) -->
+  <section class="chapter" id="ch-scrub">
+    <video id="scrub-video" class="scrub-video" src="assets/intro-scrub.mp4" poster="assets/intro-scrub-poster.jpg"
+      muted playsinline webkit-playsinline preload="auto"></video>
+    <!-- filled from MEMORIES: all 12 memory photos burst out of the door -->
+    <div class="pols" aria-hidden="true"></div>
+    <div class="filmic"></div>
+    <p class="scrub-cue">scroll to step through</p>
+    <div class="scrub-bar"><div id="scrub-fill" class="scrub-fill"></div></div>
+  </section>
+
+  <!-- the index -->
+  <section class="chapter" id="ch-index">
+    <div id="index-card">
+      <h2>Dianaland</h2>
+      <p class="sub">the easy way in.</p>
+      <!-- the same page, reached the long way: the journey's completion,
+           standing in the temple's own morning (copy in Diana's voice) -->
+      <p class="sub sub-dawn">morning, traveller - you walked the whole of it.<br>
+        the forest, the sea, the funhouse, the quiet room.<br>
+        you stayed, so the light came back.</p>
+      <nav>
+        <a href="mailto:dianaharkin@gmail.com?subject=Booking%20Diana">Book a show</a>
+        <a href="#" data-act="music">Listen</a>
+        <a href="#" data-act="reel">Watch the reel</a>
+        <a href="#" data-act="photos">Photos</a>
+        <a href="#" data-act="bio">Bio &amp; Press</a>
+        <a href="#" data-todo>Mailing list</a>
+      </nav>
+      <button id="back-door">…or take the red door.</button>
+      <button id="back-again">walk it again - the door remembers you.</button>
+      <p id="end-rule">stay for the whole night and the morning is yours.</p>
+      <div id="social-row">
+        <a target="_blank" rel="noopener" href="https://www.instagram.com/welcometodianaland">Instagram</a>
+        <a target="_blank" rel="noopener" href="https://www.facebook.com/welcometodianaland">Facebook</a>
+        <a target="_blank" rel="noopener" href="https://www.threads.net/@welcometodianaland">Threads</a>
+        <a target="_blank" rel="noopener" href="https://www.youtube.com/@welcometodianaland">YouTube</a>
+        <a target="_blank" rel="noopener" href="https://www.tiktok.com/@welcometodianaland">TikTok</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · the forest -->
+  <section class="chapter" id="ch-forest">
+    <div class="painting">
+      <div class="layer" id="L-base" data-dx="10" data-dy="6"><img src="assets/matte-master.webp" alt=""></div>
+      <div class="shaft" style="left:24%;width:13%"></div>
+      <div class="shaft" style="left:47%;width:9%;animation-delay:-3.2s"></div>
+      <div class="shaft" style="left:66%;width:15%;animation-delay:-6s"></div>
+      <button id="lion-hot" aria-label="A lion's shadow waits between the trees">
+        <img src="assets/lion-shadow.webp" alt=""></button>
+      <div class="layer" data-dx="20" data-dy="11">
+        <button id="diana-forest-hot" aria-label="Diana, in a gold dress, leans against a tree">
+          <img src="assets/diana-forest-gold.webp" alt=""></button>
+      </div>
+      <div class="layer" id="L-fg" data-dx="46" data-dy="24">
+        <img src="assets/matte-fg.webp" alt="">
+      </div>
+      <button id="heart-hot" aria-label="A glass heart hangs from a branch">
+        <div class="cord"></div>
+        <img src="assets/heart-diana.webp" alt=""></button>
+      <div class="fly" style="left:18%;top:58%;animation-delay:-1s"></div>
+      <div class="fly" style="left:31%;top:44%;animation-delay:-2.5s"></div>
+      <div class="fly" style="left:55%;top:62%;animation-delay:-.6s"></div>
+      <div class="fly" style="left:71%;top:38%;animation-delay:-3.4s"></div>
+      <div class="fly" style="left:84%;top:55%;animation-delay:-1.8s"></div>
+    </div>
+    <div class="realm-title"><h2>The Forest</h2><p>roam my forests — something is moving in the leaves.</p></div>
+  </section>
+
+  <!-- 2.5 · the drift from forest to sea (scroll to move) -->
+  <section class="chapter" id="ch-scrub2">
+    <video id="scrub2-video" class="scrub-video" src="assets/forest-sea-scrub.mp4" poster="assets/forest-sea-poster.jpg"
+      muted playsinline webkit-playsinline preload="auto"></video>
+    <div class="filmic"></div>
+    <p class="scrub-cue">scroll to drift on</p>
+    <div class="scrub-bar"><div id="scrub2-fill" class="scrub-fill"></div></div>
+  </section>
+
+  <!-- 3 · the shore (sea v3) — back to front: living water, far wash,
+       fish, Diana, near wash. Base + Diana are the same aligned plate. -->
+  <section class="chapter" id="ch-sea">
+    <div class="painting">
+      <div class="layer" id="SH-base" data-dx="10" data-dy="5">
+        <canvas id="sea-gl"></canvas>
+        <picture id="sea-fallback">
+          <source media="(orientation: portrait)" srcset="assets/shore-base-tall.webp">
+          <img src="assets/shore-base.webp" alt="">
+        </picture>
+      </div>
+      <div class="layer" id="SH-surf" data-dx="22" data-dy="10" aria-hidden="true">
+        <picture>
+          <source media="(orientation: portrait)" srcset="assets/shore-surf-tall.webp">
+          <img src="assets/shore-surf.webp" alt="">
+        </picture>
+      </div>
+      <div class="layer" id="SH-diana" data-dx="32" data-dy="15">
+        <picture>
+          <source media="(orientation: portrait)" srcset="assets/shore-diana-tall.webp">
+          <img src="assets/shore-diana.webp" alt="Diana kneeling in the surf at the water's edge">
+        </picture>
+      </div>
+      <div class="fly c" style="left:24%;top:56%;animation-delay:-1.2s"></div>
+      <div class="fly c" style="left:38%;top:70%;animation-delay:-2.8s"></div>
+      <div class="fly c" style="left:70%;top:64%;animation-delay:-.4s"></div>
+      <div class="fly c" style="left:84%;top:48%;animation-delay:-3.1s"></div>
+      <div class="layer" id="SH-wash" data-dx="48" data-dy="22" aria-hidden="true">
+        <picture>
+          <source media="(orientation: portrait)" srcset="assets/shore-wash-tall.webp">
+          <img src="assets/shore-wash.webp" alt="">
+        </picture>
+      </div>
+    </div>
+    <!-- the record spins above the shore; every song is a door -->
+    <button id="record-hot" aria-label="A record spins above the water — touch it to hear the music">
+      <span class="disc"><span class="rlabel"></span></span>
+    </button>
+    <div class="realm-title"><h2>The Sea</h2><p>swim my seas — touch the water, and keep drifting: it gets deeper.</p></div>
+  </section>
+
+  <!-- 3.5 · the dive from sea to funhouse (scroll to move) -->
+  <section class="chapter" id="ch-scrub3">
+    <video id="scrub3-video" class="scrub-video" src="assets/sea-funhouse-scrub.mp4" poster="assets/sea-funhouse-poster.jpg"
+      muted playsinline webkit-playsinline preload="none"></video>
+    <div class="filmic"></div>
+    <p class="scrub-cue">scroll to sink under</p>
+    <div class="scrub-bar"><div id="scrub3-fill" class="scrub-fill"></div></div>
+  </section>
+
+  <!-- 4 · the funhouse -->
+  <section class="chapter" id="ch-funhouse">
+    <div class="painting">
+      <div class="layer" id="F-base" data-dx="10" data-dy="6"><img src="assets/matte-funhouse.webp" alt=""></div>
+      <!-- the two mirrors painted INTO the corridor get living glass too:
+           this layer matches F-base depths exactly so the ghosts stay
+           welded to their painted frames -->
+      <div class="layer" id="F-glass" data-dx="10" data-dy="6">
+        <button class="bmirror" id="mg-stand" aria-label="The standing mirror — a different Diana lives behind the glass"></button>
+        <button class="bmirror" id="mg-hall" aria-label="The corridor mirror — a different Diana lives behind the glass"></button>
+      </div>
+      <div class="layer" data-dx="30" data-dy="16">
+        <button class="mirror-hot" id="mir-tall" aria-label="A tall funhouse mirror hanging on a cord — a Diana glows behind the glass">
+          <span class="mcord"></span><img src="assets/mirror-tall.webp" alt=""></button>
+        <button class="mirror-hot" id="mir-oval" aria-label="An oval rococo mirror hanging on a cord — a Diana glows behind the glass">
+          <span class="mcord"></span><img src="assets/mirror-oval.webp" alt=""></button>
+        <button class="mirror-hot" id="mir-roses" aria-label="A mirror wrapped in dead roses, hanging on a cord — a Diana glows behind the glass">
+          <span class="mcord"></span><img src="assets/mirror-roses.webp" alt=""></button>
+        <button id="tv-hot" aria-label="An old television hissing with static">
+          <canvas id="tv-static" aria-hidden="true"></canvas>
+          <img src="assets/tv.webp" alt="" onerror="this.closest('button').style.display='none'"></button>
+        <button id="phone-hot" aria-label="A red telephone — the booking line">
+          <img src="assets/telephone.webp" alt="" onerror="this.closest('button').style.display='none'"></button>
+        <button id="doll-hot" aria-label="A doll with no face">
+          <img src="assets/doll-v2.webp" alt="" onerror="this.src='assets/doll.webp'"></button>
+      </div>
+      <div class="fly p" style="left:22%;top:40%;animation-delay:-1.4s"></div>
+      <div class="fly p" style="left:64%;top:34%;animation-delay:-2.9s"></div>
+      <div class="fly" style="left:52%;top:52%;animation-delay:-.9s"></div>
+    </div>
+    <div class="realm-title"><h2>The Funhouse</h2><p>get pleasantly lost — every mirror remembers a different Diana.</p></div>
+  </section>
+
+  <!-- 4.5 · the corridor opens into the temple (scroll to move) -->
+  <section class="chapter" id="ch-scrub4">
+    <video id="scrub4-video" class="scrub-video" src="assets/funhouse-temple-scrub.mp4" poster="assets/funhouse-temple-poster.jpg"
+      muted playsinline webkit-playsinline preload="none"></video>
+    <div class="filmic"></div>
+    <p class="scrub-cue">scroll toward the light</p>
+    <div class="scrub-bar"><div id="scrub4-fill" class="scrub-fill"></div></div>
+  </section>
+
+  <!-- 5 · the temple -->
+  <section class="chapter shelfmode" id="ch-temple">
+    <div class="painting">
+      <div class="layer" id="T-base" data-dx="10" data-dy="6"><img src="assets/matte-temple.webp" alt=""></div>
+      <div class="layer" id="T-dawn" data-dx="10" data-dy="6"><img src="assets/matte-temple-sunrise.webp" alt=""></div>
+      <!-- the small floating broken pillar was cut at Diana's 8/20 pass -->
+      <!-- the giant candle, lifted from the photograph itself; depths match
+           T-base so it stays welded over its own pixels. It sits UNDER the
+           pillar cutouts, so the right pillar passes in front of it -->
+      <div class="layer" id="T-candle" data-dx="10" data-dy="6" aria-hidden="true">
+        <img src="assets/candle-giant.webp" alt="">
+      </div>
+      <div class="layer" id="T-pillars" data-dx="52" data-dy="26" aria-hidden="true">
+        <img class="pl-vines" src="assets/pillar-vines.webp" alt="">
+        <img class="pl-intact" src="assets/pillar-intact.webp" alt="">
+      </div>
+      <div class="layer" data-dx="34" data-dy="18">
+        <button id="shelf-hot" aria-label="A bookshelf leans against the pillar; its books are restless">
+          <img src="assets/bookshelf.webp" alt=""
+            onerror="document.getElementById('ch-temple').classList.remove('shelfmode');this.closest('button').style.display='none'"></button>
+        <button class="book-hot" id="book-navy" aria-label="A navy leather book, gold-tooled, waiting to be read">
+          <img src="assets/book-navy.webp" alt=""></button>
+        <button class="book-hot" id="book-red" aria-label="A red leather book with gold flowers">
+          <img src="assets/book-red.webp" alt=""></button>
+      </div>
+      <div class="fly" style="left:30%;top:60%;animation-delay:-1.1s"></div>
+      <div class="fly" style="left:58%;top:66%;animation-delay:-2.2s"></div>
+    </div>
+    <div class="realm-title"><h2>The Temple</h2>
+      <p id="temple-night-line">the quiet room — touch a candle, and keep still: dawn is close.</p>
+      <p id="temple-dawn-line">morning finds Dianaland — you stayed until the light came back.</p>
+    </div>
+  </section>
+</div>
+
+<div id="fx" aria-hidden="true">
+  <div id="fx-sun">
+    <i style="left:22%;top:16%"></i><i style="left:33%;top:28%;animation-delay:-.4s"></i>
+    <i style="left:15%;top:34%;animation-delay:-.8s"></i><i style="left:44%;top:14%;animation-delay:-.2s"></i>
+    <i style="left:52%;top:36%;animation-delay:-.9s"></i><i style="left:28%;top:48%;animation-delay:-.6s"></i>
+    <i style="left:64%;top:22%;animation-delay:-1.1s"></i><i style="left:12%;top:12%;animation-delay:-.3s"></i>
+  </div>
+  <div id="fx-spot"></div>
+  <div id="fx-smoke"></div>
+</div>
+
+<canvas id="swoop-gl" aria-hidden="true"></canvas>
+<div id="ghosts" aria-hidden="true"></div>
+<div id="veil"><div class="glow"></div></div>
+<button id="mute-btn" aria-label="Sound on — tap to mute">
+  <svg class="on-ic" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M18.8 6a8.5 8.5 0 0 1 0 12"/></svg>
+  <svg class="off-ic" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><line x1="16.5" y1="9" x2="21.5" y2="15"/><line x1="21.5" y1="9" x2="16.5" y2="15"/></svg>
+</button>
+<!-- the way back: always on screen once you are past the two doors -->
+<div id="nav-hud">
+  <button class="hud-btn" id="back-btn" data-tip="back" aria-label="Go back one step">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.5 4.5 8 12l7.5 7.5"/></svg>
+  </button>
+  <button class="hud-btn" id="home-btn" data-tip="the door" aria-label="Back to the red door and the easy button">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V4.6A1.6 1.6 0 0 1 7.6 3h8.8A1.6 1.6 0 0 1 18 4.6V21"/><path d="M3.5 21h17"/><circle cx="14.6" cy="12.4" r="1.05"/></svg>
+  </button>
+</div>
+<p id="scrollcue">drift forward &middot; scroll back to return</p>
+<div id="room" role="dialog" aria-modal="true">
+  <div id="roomcard"><h3 id="room-title"></h3><p id="room-body"></p>
+    <button id="close">leave the room</button></div>
+</div>
+
+<script>
+/* ============ chapter state ============ */
+const veil=document.getElementById('veil'),cue=document.getElementById('scrollcue');
+/* the cue used to live only in the forest and only said "forward" — testers
+   never learned the walk was two-way. Now every realm shows it on arrival,
+   naming both directions, and it fades after six seconds so the art wins. */
+function showCue(){cue.classList.add('on');clearTimeout(window.__cueT);
+  window.__cueT=setTimeout(()=>cue.classList.remove('on'),6000);}
+const WORLD=['ch-forest','ch-sea','ch-funhouse','ch-temple'];   /* wheel-navigable world chapters */
+let mode='title';                      /* title | choice | scrub | index | world */
+let worldIdx=0,transitioning=false;
+function showEl(id){document.querySelectorAll('.chapter').forEach(c=>c.classList.toggle('on',c.id===id));
+  /* mode is sometimes assigned after showEl (inside a wipe's callback), so
+     the cluster syncs on the next turn rather than this instant */
+  setTimeout(()=>{if(typeof syncHud==='function'){syncHud();histSync();}},0);}
+/* a wipe requested while one is running is QUEUED, not swallowed — the old
+   silent drop left a ~1.5s dead zone where back-gestures died (Diana's
+   "backwards sometimes doesn't work") */
+let pendingWipe=null;
+function wipeTo(id,realm,after){
+  if(transitioning){pendingWipe=[id,realm,after];return;}
+  transitioning=true;
+  veil.dataset.realm=realm||'forest';veil.classList.add('on');
+  setTimeout(()=>{showEl(id);if(after)after();
+    setTimeout(()=>{veil.classList.remove('on');
+      setTimeout(()=>{transitioning=false;
+        if(pendingWipe){const p=pendingWipe;pendingWipe=null;
+          wipeTo(p[0],p[1],p[2]);}},260);},340);},650);}
+/* no arrival zoom (match cut) — instead each arrival gets its light:
+   blinding sun sparkles into the forest, the big ripple into the sea */
+function fxFlash(id){const el=document.getElementById(id);if(!el)return;
+  el.classList.remove('go');void el.offsetWidth;el.classList.add('go');}
+/* the sea gets NO flash — the veil wipe and the shore's own light carry the
+   landing (the ripple circle was cut at Diana's 8/20 pass) */
+function arrive(id){if(id==='ch-forest')fxFlash('fx-sun');
+  else if(id==='ch-funhouse')fxFlash('fx-spot');
+  else if(id==='ch-temple')fxFlash('fx-smoke');}
+
+/* ---- title dissolves into the choice ---- */
+const titleEl=document.getElementById('ch-title');
+function toChoice(){if(mode!=='title')return;mode='choice';
+  titleEl.style.transition='opacity 2.2s ease';titleEl.classList.remove('on');
+  fxFlash('fx-smoke');
+  setTimeout(()=>showEl('ch-choice'),900);}
+setTimeout(toChoice,3400);
+titleEl.addEventListener('click',toChoice);
+
+/* ---- the choice ---- */
+const video=document.getElementById('scrub-video');
+/* iOS loads nothing until a user-gesture play() unlocks the element, then sits
+   at readyState 1 while it buffers lazily — so unlock BOTH scrub videos on the
+   door tap, pause only once a frame is decodable, and never abandon a video
+   that is merely slow: the skip fallback fires only when nothing at all
+   arrives (dead src or blocked unlock). */
+function prime(v){v.muted=true;
+  const halt=()=>{v.pause();try{v.currentTime=0.001;}catch(e){}};
+  const p=v.play();
+  if(p&&p.then)p.then(()=>{if(v.readyState>=2)halt();
+    else v.addEventListener('loadeddata',halt,{once:true});}).catch(()=>{});}
+function loadingCue(v,sel,waitTxt){const c=document.querySelector(sel);
+  if(!c.dataset.cue)c.dataset.cue=c.textContent;
+  if(v.readyState>=2){c.textContent=c.dataset.cue;return;}
+  c.textContent=waitTxt;
+  v.addEventListener('loadeddata',()=>{c.textContent=c.dataset.cue;},{once:true});}
+/* iOS renders seeks asynchronously; firing a new seek while one is in flight
+   makes the scrub judder. Serialize: at most one live seek, latest target wins. */
+function seeker(v){let pend=null;
+  v.addEventListener('seeked',()=>{if(pend!==null){const t=pend;pend=null;
+    try{v.currentTime=t;}catch(e){}}});
+  return t=>{if(v.seeking){pend=t;return;}
+    try{if(Math.abs(v.currentTime-t)>0.034)v.currentTime=t;}catch(e){}};}
+const seekV=seeker(video);
+document.getElementById('choose-door').addEventListener('click',()=>{
+  mode='scrub';scrubT=0;scrubD=0;scrubShown=0;showEl('ch-scrub');glideKick();
+  prime(video);prime(video2);prime(video3);prime(video4);ac();
+  video.style.transform='translate(-50%,-50%) scale(0.38)';updatePols(0);
+  loadingCue(video,'#ch-scrub .scrub-cue','the door is waking…');
+  clearTimeout(window.__scrubFb);
+  window.__scrubFb=setTimeout(()=>{if(mode==='scrub'&&video.readyState===0)enterForest();},8000);});
+document.getElementById('choose-easy').addEventListener('click',()=>{
+  document.getElementById('ch-index').classList.remove('dawnend');
+  mode='index';showEl('ch-index');fxFlash('fx-spot');});
+document.getElementById('back-door').addEventListener('click',()=>navHome());
+/* "walk it again" - the completion page hands you back to the two doors
+   with the night reset, so the whole walk can happen again */
+document.getElementById('back-again').addEventListener('click',()=>navHome());
+
+/* ---- the scrubbed walk through the door ---- */
+var scrubT=0,scrubShown=0,scrubD=0,s2D=0,s3D=0,s4D=0;
+const fill=document.getElementById('scrub-fill');
+function enterForest(){if(mode!=='scrub')return;mode='world';worldIdx=0;
+  showEl('ch-forest');arrive('ch-forest');showCue();
+  wheelAcc=0;swipeY=null;wheelLock=true;setTimeout(()=>{wheelLock=false;wheelAcc=0;},800);}
+video.addEventListener('click',enterForest); /* tap to skip */
+function applyScrub(){if(!video.duration)return;
+  const t=Math.max(0,Math.min(video.duration-0.03,scrubD));
+  seekV(t);
+  const p=t/(video.duration-0.03);
+  /* the approach: the door starts far down the void; the first stretch of
+     scroll walks you up to it (a scale ramp is seamless on the black void) */
+  const q=Math.min(1,p/0.35),ez=q*q*(3-2*q);
+  video.style.transform=`translate(-50%,-50%) scale(${(0.38+0.62*ez).toFixed(4)})`;
+  updatePols(p);chromeFade('ch-scrub',p);
+  fill.style.width=(100*p).toFixed(1)+'%';
+  if(t>=video.duration-0.1)enterForest();}
+/* the scrub's film chrome dissolves before the match cut */
+function chromeFade(id,p){const o=p<0.86?1:Math.max(0,1-(p-0.86)/0.12);
+  document.querySelectorAll('#'+id+' .filmic, #'+id+' .scrub-cue, #'+id+' .scrub-bar')
+    .forEach(el=>el.style.opacity=o.toFixed(3));}
+
+/* The shore is a warm sunset; both scrub clips are graded cool. Rather than
+   re-shoot them, we ramp a warm grade onto the clip as it approaches the
+   shore (and back off as it leaves), so the cut lands in the same light.
+   k=0 is the clip's own grade, k=1 is the shore's. */
+function shoreGrade(v,k){k=Math.max(0,Math.min(1,k));k=k*k*(3-2*k);
+  v.style.filter=k<0.002?'':
+    `sepia(${(0.95*k).toFixed(3)}) saturate(${(1+1.25*k).toFixed(3)})`+
+    ` hue-rotate(${(-12*k).toFixed(2)}deg) brightness(${(1+0.10*k).toFixed(3)})`+
+    ` contrast(${(1+0.05*k).toFixed(3)})`;}
+
+/* ---- the drift: forest -> sea scrub ---- */
+const video2=document.getElementById('scrub2-video');
+const fill2=document.getElementById('scrub2-fill');
+const seekV2=seeker(video2);
+var s2T=0;
+function startScrub2(){if(transitioning)return;mode='scrub2';s2T=0;s2D=0;showEl('ch-scrub2');glideKick();
+  cue.classList.remove('on');
+  shoreGrade(video2,0);prime(video2);
+  loadingCue(video2,'#ch-scrub2 .scrub-cue','the tide is coming in…');
+  clearTimeout(window.__scrub2Fb);
+  window.__scrub2Fb=setTimeout(()=>{if(mode==='scrub2'&&video2.readyState===0)enterSea();},8000);}
+function applyScrub2(){if(!video2.duration)return;
+  const t=Math.max(0,Math.min(video2.duration-0.03,s2D));
+  seekV2(t);
+  const p=t/(video2.duration-0.03);
+  chromeFade('ch-scrub2',p);
+  shoreGrade(video2,(p-0.55)/0.45);        /* warm into the shore's light */
+  fill2.style.width=(100*p).toFixed(1)+'%';
+  if(t>=video2.duration-0.1)enterSea();}
+function enterSea(){if(mode!=='scrub2')return;mode='world';worldIdx=1;
+  showEl('ch-sea');arrive('ch-sea');showCue();
+  wheelAcc=0;swipeY=null;wheelLock=true;setTimeout(()=>{wheelLock=false;wheelAcc=0;},800);}
+video2.addEventListener('click',enterSea);
+video.addEventListener('error',()=>{if(mode==='scrub')enterForest();});
+video2.addEventListener('error',()=>{if(mode==='scrub2')enterSea();});
+
+/* ---- the dive: sea -> funhouse scrub ---- */
+const video3=document.getElementById('scrub3-video');
+const fill3=document.getElementById('scrub3-fill');
+const seekV3=seeker(video3);
+var s3T=0;
+function startScrub3(){if(transitioning)return;mode='scrub3';s3T=0;s3D=0;showEl('ch-scrub3');glideKick();
+  cue.classList.remove('on');
+  shoreGrade(video3,1);prime(video3);
+  loadingCue(video3,'#ch-scrub3 .scrub-cue','the water is getting deeper…');
+  clearTimeout(window.__scrub3Fb);
+  window.__scrub3Fb=setTimeout(()=>{if(mode==='scrub3'&&video3.readyState===0)enterFunhouse();},8000);}
+function applyScrub3(){if(!video3.duration)return;
+  const t=Math.max(0,Math.min(video3.duration-0.03,s3D));
+  seekV3(t);
+  const p=t/(video3.duration-0.03);
+  shoreGrade(video3,1-p/0.45);             /* leave the shore, cool into the dive */
+  fill3.style.width=(100*p).toFixed(1)+'%';
+  if(t>=video3.duration-0.1)enterFunhouse();}
+function enterFunhouse(){if(mode!=='scrub3')return;mode='world';worldIdx=2;
+  showEl('ch-funhouse');arrive('ch-funhouse');showCue();
+  wheelAcc=0;swipeY=null;wheelLock=true;setTimeout(()=>{wheelLock=false;wheelAcc=0;},800);}
+video3.addEventListener('click',enterFunhouse);
+video3.addEventListener('error',()=>{if(mode==='scrub3')enterFunhouse();});
+
+/* ---- the opening: funhouse -> temple scrub ---- */
+const video4=document.getElementById('scrub4-video');
+const fill4=document.getElementById('scrub4-fill');
+const seekV4=seeker(video4);
+var s4T=0;
+function startScrub4(){if(transitioning)return;mode='scrub4';s4T=0;s4D=0;showEl('ch-scrub4');glideKick();
+  cue.classList.remove('on');
+  prime(video4);
+  loadingCue(video4,'#ch-scrub4 .scrub-cue','something is opening ahead…');
+  clearTimeout(window.__scrub4Fb);
+  window.__scrub4Fb=setTimeout(()=>{if(mode==='scrub4'&&video4.readyState===0)enterTemple();},8000);}
+function applyScrub4(){if(!video4.duration)return;
+  const t=Math.max(0,Math.min(video4.duration-0.03,s4D));
+  seekV4(t);
+  fill4.style.width=(100*t/(video4.duration-0.03)).toFixed(1)+'%';
+  if(t>=video4.duration-0.1)enterTemple();}
+function enterTemple(){if(mode!=='scrub4')return;mode='world';worldIdx=3;
+  showEl('ch-temple');arrive('ch-temple');showCue();
+  wheelAcc=0;swipeY=null;wheelLock=true;setTimeout(()=>{wheelLock=false;wheelAcc=0;},800);
+  /* dawn finds you three ways: scroll on, touch the candle, or simply stay */
+  clearTimeout(window.__dawnT);
+  window.__dawnT=setTimeout(()=>{if(mode==='world'&&worldIdx===3)dawn();},45000);}
+video4.addEventListener('click',enterTemple);
+video4.addEventListener('error',()=>{if(mode==='scrub4')enterTemple();});
+
+/* ---- dawn: the temple keeps the whole night, then lets it go ---- */
+let dawned=false;
+function dawn(){if(dawned)return;dawned=true;
+  document.getElementById('ch-temple').classList.add('dawn');}
+
+/* ============ the final swoop — through the temple, into sunrise ============
+   WebGL: after dawn, one more scroll flies the camera into the light
+   between the pillars (dolly zoom + radial motion blur + bloom to warm
+   white on the sunrise matte) and the business page is waiting on the
+   other side. Falls back to a straight cut when WebGL is missing. */
+const swoop=(function(){
+  const cv=document.getElementById('swoop-gl');
+  let gl=null,pr=null,ready=false,running=false,texA=2048/1143;
+  let uP=null,uCanA=null,uTexA=null;
+  const VS='attribute vec2 aP;varying vec2 vUv;'+
+    'void main(){vUv=vec2(aP.x*0.5+0.5,0.5-aP.y*0.5);gl_Position=vec4(aP,0.,1.);}';
+  const FS='precision highp float;varying vec2 vUv;'+
+    'uniform sampler2D uTex;uniform float uP,uCanA,uTexA;'+
+    'void main(){'+
+    '  vec2 uv=vUv;float sx=1.0,sy=1.0;'+
+    '  if(uCanA>uTexA){sy=uTexA/uCanA;}else{sx=uCanA/uTexA;}'+
+    '  uv=(uv-0.5)*vec2(sx,sy)+0.5;'+
+    '  vec2 focus=vec2(0.50,0.42);'+
+    '  float z=1.0+uP*uP*2.6;'+
+    '  vec2 zuv=(uv-focus)/z+focus;'+
+    '  vec3 col=vec3(0.0);'+
+    '  for(int i=0;i<6;i++){'+
+    '    float k=float(i)/6.0*0.06*uP;'+
+    '    col+=texture2D(uTex,(zuv-focus)*(1.0-k)+focus).rgb;}'+
+    '  col/=6.0;'+
+    '  float w=smoothstep(0.55,1.0,uP);'+
+    '  col=mix(col,vec3(1.0,0.93,0.82),w*w);'+
+    '  float v=1.0-0.25*(1.0-uP)*length(vUv-0.5);'+
+    '  gl_FragColor=vec4(col*v,1.0);}';
+  function init(){
+    if(gl)return true;
+    gl=cv.getContext('webgl',{antialias:false,alpha:false});
+    if(!gl)return false;
+    const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);
+      return gl.getShaderParameter(o,gl.COMPILE_STATUS)?o:null;};
+    const vs=sh(gl.VERTEX_SHADER,VS),fs=sh(gl.FRAGMENT_SHADER,FS);
+    if(!vs||!fs)return false;
+    pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS))return false;
+    gl.useProgram(pr);
+    const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+    const aP=gl.getAttribLocation(pr,'aP');gl.enableVertexAttribArray(aP);
+    gl.vertexAttribPointer(aP,2,gl.FLOAT,false,0,0);
+    uP=gl.getUniformLocation(pr,'uP');
+    uCanA=gl.getUniformLocation(pr,'uCanA');
+    uTexA=gl.getUniformLocation(pr,'uTexA');
+    const tex=gl.createTexture();
+    const im=new Image();im.src='assets/matte-temple-sunrise.webp';
+    im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,tex);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,im);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      texA=im.width/im.height;ready=true;};
+    return true;}
+  function land(){document.getElementById('ch-index').classList.add('dawnend');
+    mode='index';showEl('ch-index');}
+  function start(){
+    if(running)return;
+    if(!init()){land();return;}
+    running=true;whoosh();
+    cv.style.opacity=1;cv.style.display='block';
+    const DUR=2800,t0=performance.now();
+    let finished=false;
+    function finish(){if(finished)return;finished=true;
+      clearTimeout(safety);land();cv.style.opacity=0;
+      setTimeout(()=>{cv.style.display='none';running=false;},950);}
+    /* wall-clock safety: rAF pauses when the window is hidden/occluded —
+       the landing on the business page must never depend on it */
+    const safety=setTimeout(finish,DUR+700);
+    (function frame(){
+      if(finished||!running)return;
+      const p=Math.min(1,(performance.now()-t0)/DUR);
+      if(ready){
+        const dpr=Math.min(devicePixelRatio,1.5);
+        const w=Math.round(cv.clientWidth*dpr),h=Math.round(cv.clientHeight*dpr);
+        if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;gl.viewport(0,0,w,h);}
+        gl.uniform1f(uP,p);
+        gl.uniform1f(uCanA,cv.clientWidth/cv.clientHeight);
+        gl.uniform1f(uTexA,texA);
+        gl.drawArrays(gl.TRIANGLES,0,3);}
+      if(p>=1){finish();return;}
+      requestAnimationFrame(frame);})();}
+  return {start};
+})();
+/* sharper phone scrubs: portrait-crop encodes are used when present next to
+   the landscape files (see the architecture log for the ffmpeg recipe) — a
+   HEAD probe keeps this harmless while the files don't exist yet */
+(function(){if(!matchMedia('(orientation: portrait)').matches)return;
+  [[video,'intro-scrub-portrait.mp4'],
+   [video2,'forest-sea-scrub-portrait.mp4'],
+   [video3,'sea-funhouse-scrub-portrait.mp4'],
+   [video4,'funhouse-temple-scrub-portrait.mp4']].forEach(([v,name])=>{
+    const url=v.src.replace(/[^\/]+$/,name);
+    fetch(url,{method:'HEAD'}).then(r=>{
+      if(r.ok&&(mode==='title'||mode==='choice')){v.src=url;v.load();}})
+    .catch(()=>{});});})();
+let wheelAcc=0,wheelLock=false,swipeY=null;
+const room=document.getElementById('room');
+/* the target / displayed pair of whichever scrub owns the screen */
+function scrubTgt(){return mode==='scrub'?scrubT:mode==='scrub2'?s2T:mode==='scrub3'?s3T:mode==='scrub4'?s4T:null;}
+function scrubDisp(){return mode==='scrub'?scrubD:mode==='scrub2'?s2D:mode==='scrub3'?s3D:mode==='scrub4'?s4D:null;}
+/* Trackpads emit dozens of TINY deltas, so the old `e.deltaY<-40` test could
+   never fire on one: a trackpad user who scrolled back to the start of a walk
+   was simply stuck there with no way out. Back-pressure is ACCUMULATED now —
+   one mouse notch clears it instantly, a trackpad clears it in a short push —
+   and all four walks share the one branch, so they can't drift apart again. */
+let backPress=0,backPressAt=0;
+addEventListener('wheel',e=>{
+  if(room.classList.contains('open'))return;
+  if(mode.indexOf('scrub')===0){
+    scrubStep(e.deltaY*0.0044);
+    if(e.deltaY<0){const now=performance.now();
+      if(now-backPressAt>700)backPress=0;      /* a pause resets the ask */
+      backPressAt=now;
+      const tg=scrubTgt();
+      if(tg!==null&&tg<=0&&scrubDisp()<0.12){backPress+=-e.deltaY;
+        if(backPress>70){backPress=0;scrubBackExit();}}}
+    else if(e.deltaY>0)backPress=0;
+    return;}
+  if(mode!=='world')return;
+  if(wheelLock)return;
+  wheelAcc+=e.deltaY;
+  if(wheelAcc>160){wheelAcc=0;goForward();}
+  /* backwards asks a little LESS than forwards — it is the direction people
+     reach for the moment they feel lost */
+  else if(wheelAcc<-110){wheelAcc=0;goBack();}},
+  {passive:true});
+/* the path forward: each world hands off to the next scrub; the temple ends in dawn */
+function goForward(){
+  /* a forward gesture during a realm wipe is RETRIED once it clears —
+     never silently eaten (mirror of the goBack queue) */
+  if(transitioning){clearTimeout(window.__fwdRetry);
+    window.__fwdRetry=setTimeout(()=>{if(!transitioning&&mode==='world')goForward();},450);
+    return;}
+  whoosh();
+  if(worldIdx===0){wheelLock=true;
+    startScrub2();setTimeout(()=>wheelLock=false,900);}
+  else if(worldIdx===1){wheelLock=true;
+    startScrub3();setTimeout(()=>wheelLock=false,900);}
+  else if(worldIdx===2){wheelLock=true;
+    startScrub4();setTimeout(()=>wheelLock=false,900);}
+  else if(worldIdx===3){
+    /* first scroll brings the dawn; the next one swoops through the temple
+       into the sunrise — and lands on the business page */
+    if(!dawned)dawn();else{wheelLock=true;swoop.start();
+      setTimeout(()=>wheelLock=false,1200);}}}
+function goBack(){whoosh();
+  if(worldIdx===1){wheelLock=true;
+    wipeTo('ch-forest','forest',()=>{worldIdx=0;mode='world';showCue();});
+    setTimeout(()=>wheelLock=false,900);}
+  else if(worldIdx===2){wheelLock=true;
+    wipeTo('ch-sea','sea',()=>{worldIdx=1;mode='world';});
+    setTimeout(()=>wheelLock=false,900);}
+  else if(worldIdx===3){wheelLock=true;
+    wipeTo('ch-funhouse','funhouse',()=>{worldIdx=2;mode='world';});
+    setTimeout(()=>wheelLock=false,900);}
+  /* the forest used to be a one-way door: scrolling back from it did NOTHING,
+     which is exactly the "how do I get back to the beginning" complaint.
+     It now walks back out to the two doors through an amber veil. */
+  else if(worldIdx===0){wheelLock=true;mode='leaving';
+    wipeTo('ch-choice','door',()=>{mode='choice';cue.classList.remove('on');
+      wheelLock=false;wheelAcc=0;});}}
+/* ============ the way back (buttons · keys · phone back gesture) ============
+   Every backward affordance funnels through these two so they can never
+   disagree with each other. navBack() is one step; navHome() is the whole
+   way out to the red door and the easy button, from anywhere. */
+function navBack(force){
+  if(room.classList.contains('open')){closeRoom();return;}
+  if(mode==='title'||mode==='choice'||mode==='leaving')return;
+  if(mode==='index'){navHome();return;}
+  if(mode.indexOf('scrub')===0){scrubBackExit();return;}
+  /* `force` = a button, a key or the phone's back gesture: deliberate, so it
+     ignores the gesture debounce that exists only to tame wheels and thumbs */
+  if(mode==='world'){if(!force&&(wheelLock||transitioning))return;goBack();}}
+function navHome(){
+  if(mode==='choice'||mode==='title'||mode==='leaving')return;
+  if(room.classList.contains('open'))closeRoom();
+  if(histArmed){histSkip=true;try{history.back();}catch(e){histSkip=false;histArmed=false;}}
+  clearTimeout(window.__dawnT);
+  mode='leaving';                       /* stops the glide loop immediately */
+  wheelLock=true;wheelAcc=0;swipeY=null;touchY0=null;
+  glideV=0;cancelAnimationFrame(glideRAF);
+  cue.classList.remove('on');
+  wipeTo('ch-choice','door',()=>{
+    /* the night resets, so the whole walk can happen again */
+    dawned=false;
+    document.getElementById('ch-temple').classList.remove('dawn');
+    document.getElementById('ch-index').classList.remove('dawnend');
+    mode='choice';wheelLock=false;wheelAcc=0;});}
+document.getElementById('back-btn').addEventListener('click',e=>{e.stopPropagation();navBack(true);});
+document.getElementById('home-btn').addEventListener('click',e=>{e.stopPropagation();navHome();});
+
+/* the cluster hides at the title and the two doors (you are already there)
+   and reveals its labels once, the first time it appears */
+const hud=document.getElementById('nav-hud');let hudSeen=false;
+function syncHud(){const show=(mode!=='title'&&mode!=='choice');
+  hud.classList.toggle('on',show);
+  if(show&&!hudSeen){hudSeen=true;hud.classList.add('tips');
+    setTimeout(()=>hud.classList.remove('tips'),5200);}}
+
+/* the phone's own back gesture is the most natural "go back" there is, so it
+   steps back through Dianaland instead of leaving it. One sentinel entry is
+   held behind us while we are past the beginning; at the two doors we stop
+   re-pushing, so a real back press does leave the site. */
+let histArmed=false,histSkip=false;
+function histSync(){
+  if(mode!=='title'&&mode!=='choice'&&!histArmed){
+    histArmed=true;try{history.pushState({dl:1},'');}catch(e){}}}
+addEventListener('popstate',()=>{
+  /* navHome() spent the sentinel itself — swallow that one pop */
+  if(histSkip){histSkip=false;histArmed=false;return;}
+  histArmed=false;
+  if(mode==='title'||mode==='choice')return;   /* the next back really leaves */
+  navBack(true);});
+
+/* ---- keyboard: arrows, page keys, space, Home and Escape all navigate ---- */
+let kbZero=false;
+addEventListener('keydown',e=>{
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  const k=e.key,tag=(e.target&&e.target.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA')return;
+  if(k==='Escape'){e.preventDefault();
+    if(room.classList.contains('open'))closeRoom();else navHome();return;}
+  if(room.classList.contains('open'))return;
+  if(k==='Home'){e.preventDefault();navHome();return;}
+  /* space/enter on a focused button is that BUTTON's press, not a step */
+  if((k===' '||k==='Spacebar'||k==='Enter')&&(tag==='BUTTON'||tag==='A'))return;
+  const fwd=(k==='ArrowDown'||k==='PageDown'||k===' '||k==='Spacebar'||k==='Enter');
+  const bwd=(k==='ArrowUp'||k==='PageUp'||k==='Backspace');
+  if(!fwd&&!bwd)return;
+  if(mode==='title'){if(fwd){e.preventDefault();toChoice();}return;}
+  if(mode==='choice'||mode==='index'||mode==='leaving')return;
+  e.preventDefault();
+  if(mode.indexOf('scrub')===0){
+    const t=scrubStep(fwd?0.42:-0.42);
+    if(fwd)kbZero=false;
+    /* one press lands you at the start, the next one steps out of the walk */
+    else if(t!==null&&t<=0){if(kbZero){kbZero=false;scrubBackExit();}else kbZero=true;}
+    return;}
+  if(mode==='world'){if(fwd){if(!wheelLock&&!transitioning)goForward();}else navBack(true);}});
+
+/* ============ the scrub GLIDE (all devices) ============
+   Inputs never touch the film directly any more. Wheel notches, finger
+   drags and momentum all push a TARGET; this spring chases it every
+   frame and the film renders from the chased value - so stepped mouse
+   wheels and jittery thumbs become one continuous gliding motion. */
+let glideLoopOn=false;
+function glideKick(){if(glideLoopOn)return;glideLoopOn=true;
+  (function g(){
+    if(mode.indexOf('scrub')!==0){glideLoopOn=false;return;}
+    if(mode==='scrub'){scrubD+=(scrubT-scrubD)*0.14;
+      if(Math.abs(scrubT-scrubD)<0.004)scrubD=scrubT;applyScrub();}
+    else if(mode==='scrub2'){s2D+=(s2T-s2D)*0.14;
+      if(Math.abs(s2T-s2D)<0.004)s2D=s2T;applyScrub2();}
+    else if(mode==='scrub3'){s3D+=(s3T-s3D)*0.14;
+      if(Math.abs(s3T-s3D)<0.004)s3D=s3T;applyScrub3();}
+    else if(mode==='scrub4'){s4D+=(s4T-s4D)*0.14;
+      if(Math.abs(s4T-s4D)<0.004)s4D=s4T;applyScrub4();}
+    requestAnimationFrame(g);})();}
+
+/* ============ touch: the scrubs GLIDE ============
+   Every finger-move leaves momentum behind (a flick keeps the drift going),
+   and — the old mobile trap — backing a scrub all the way to its start now
+   EXITS to the realm before it, exactly like the desktop wheel always did. */
+let glideV=0,glideRAF=0,touchY0=null;
+function scrubStep(d){
+  if(mode==='scrub'){scrubT=Math.max(0,Math.min((video.duration||5),scrubT+d));
+    glideKick();return scrubT;}
+  if(mode==='scrub2'){s2T=Math.max(0,Math.min((video2.duration||5),s2T+d));
+    glideKick();return s2T;}
+  if(mode==='scrub3'){s3T=Math.max(0,Math.min((video3.duration||5),s3T+d));
+    glideKick();return s3T;}
+  if(mode==='scrub4'){s4T=Math.max(0,Math.min((video4.duration||5),s4T+d));
+    glideKick();return s4T;}
+  return null;}
+function scrubBackExit(){
+  backPress=0;kbZero=false;
+  if(mode==='scrub'){mode='choice';showEl('ch-choice');
+    wheelAcc=0;wheelLock=true;setTimeout(()=>{wheelLock=false;wheelAcc=0;},700);return;}
+  if(mode==='scrub2'){mode='world';worldIdx=0;showEl('ch-forest');showCue();}
+  else if(mode==='scrub3'){mode='world';worldIdx=1;showEl('ch-sea');}
+  else if(mode==='scrub4'){mode='world';worldIdx=2;showEl('ch-funhouse');}
+  else return;
+  wheelAcc=0;wheelLock=true;setTimeout(()=>{wheelLock=false;wheelAcc=0;},700);}
+function glide(){cancelAnimationFrame(glideRAF);
+  const tick=()=>{
+    if(mode.indexOf('scrub')!==0||Math.abs(glideV)<0.0008){glideV=0;return;}
+    const t=scrubStep(glideV);glideV*=0.94;
+    if(t===null){glideV=0;return;}
+    if(t<=0&&glideV<0){glideV=0;scrubBackExit();return;}
+    glideRAF=requestAnimationFrame(tick);};
+  glideRAF=requestAnimationFrame(tick);}
+addEventListener('touchstart',e=>{swipeY=e.touches[0].clientY;touchY0=swipeY;
+  glideV=0;cancelAnimationFrame(glideRAF);},{passive:true});
+/* passive:false + preventDefault stops Safari's rubber-band overscroll from
+   shaking the stage while a finger drives the scrub (the room dialog keeps
+   native behavior) */
+addEventListener('touchmove',e=>{if(swipeY===null)return;
+  /* preventDefault ONLY while a scrub owns the finger — in the realms a
+     prevented touchmove makes iOS cancel the tap's click, which is why
+     the shelf and phone went dead on phones (body touch-action:none
+     already stops rubber-banding everywhere else) */
+  if(mode.indexOf('scrub')!==0)return;
+  if(e.target&&e.target.closest&&e.target.closest('#room'))return;
+  if(e.cancelable)e.preventDefault();
+  const y=e.touches[0].clientY,d=(swipeY-y)*0.009;
+  swipeY=y;
+  glideV=0.6*glideV+0.4*d;
+  const t=scrubStep(d);
+  /* already at the scrub's start + a deliberate downward gesture = leave */
+  if(t!==null&&t<=0&&d<0&&(touchY0-y)<-44)scrubBackExit();},{passive:false});
+/* a world chapter only yields to a fresh, deliberate swipe: the gesture that
+   finished a scrub can't also leave the realm (swipeY is cleared on arrival),
+   and the settle lock holds while a realm is still fading in */
+addEventListener('touchend',e=>{if(swipeY===null)return;
+  const endY=e.changedTouches[0].clientY;
+  if(mode==='world'&&!wheelLock&&!transitioning){const dy=swipeY-endY;
+    if(dy>110)goForward();
+    else if(dy<-70)goBack();}   /* backwards asks a little LESS of the thumb */
+  else if(mode.indexOf('scrub')===0){
+    if(Math.abs(glideV)>0.004)glide();
+    /* a slow drag down at the very start leaves no momentum for the glide to
+       catch — without this the start of a walk was a mobile dead end */
+    else{const tg=scrubTgt();
+      if(tg!==null&&tg<=0&&touchY0!==null&&(endY-touchY0)>44)scrubBackExit();}}
+  swipeY=null;touchY0=null;},{passive:true});
+
+/* ============ parallax — inches, not meters ============ */
+const layers=[...document.querySelectorAll('.chapter .layer')];
+let px=0,py=0,tx=0,ty=0;
+addEventListener('pointermove',e=>{tx=(e.clientX/innerWidth)*2-1;ty=(e.clientY/innerHeight)*2-1;});
+addEventListener('deviceorientation',e=>{if(e.gamma!=null){tx=Math.max(-1,Math.min(1,e.gamma/24));
+  ty=Math.max(-1,Math.min(1,(e.beta-48)/28));}},true);
+let t0=performance.now();
+(function tick(){const t=(performance.now()-t0)/1000;
+  const ix=Math.sin(t*0.11)*0.30,iy=Math.cos(t*0.08)*0.18;
+  px+=((tx*0.75+ix)-px)*0.03;py+=((ty*0.55+iy)-py)*0.03;
+  for(const L of layers){const dx=+L.dataset.dx,dy=+L.dataset.dy;
+    L.style.transform=`translate3d(${(-px*dx).toFixed(2)}px,${(-py*dy).toFixed(2)}px,0)`;}
+  syncHud();histSync();
+  requestAnimationFrame(tick);})();
+
+/* ============ living water — ripples + sun glimmer (WebGL) ============ */
+(function(){
+  const cv=document.getElementById('sea-gl');
+  const gl=cv.getContext('webgl',{antialias:false,alpha:false});
+  if(!gl)return;
+  const isPortrait=()=>matchMedia('(orientation: portrait)').matches;
+  const CONF={
+    wide:{src:'assets/shore-base.webp',horizon:0.320,shore:0.385,sun:[0.561,0.320],texA:2048/1143},
+    tall:{src:'assets/shore-base-tall.webp',horizon:0.320,shore:0.385,sun:[0.588,0.320],texA:1152/1536}};
+  const VS=`attribute vec2 aP;varying vec2 vUv;
+    void main(){vUv=vec2(aP.x*0.5+0.5,0.5-aP.y*0.5);gl_Position=vec4(aP,0.,1.);}`;
+  const FS=`precision highp float;varying vec2 vUv;
+    uniform sampler2D uTex;uniform float uTime,uHorizon,uShore,uAspect;
+    uniform vec2 uScale,uOff,uSun;uniform vec3 uRings[6];
+    float fld(vec2 p,float t){
+      return sin(p.x*36.0+t*0.8)*0.5
+           + sin(p.x*21.0 - t*0.55 + p.y*46.0)*0.55
+           + sin(p.y*64.0 + t*1.25 + p.x*14.0)*0.6;}
+    void main(){
+      vec2 uv=vUv*uScale+uOff;
+      /* open water rises to full ripple fast (the band is thin on a shore),
+         then eases back over the wet sand so the beach shimmers instead of
+         sloshing — but never to zero, so a touch on the sand still answers */
+      float depth=smoothstep(uHorizon,uHorizon+0.045,uv.y)
+                 *(1.0-0.62*smoothstep(uShore,uShore+0.26,uv.y));
+      float t=uTime;
+      vec2 e=vec2(0.004,0.0);
+      float w0=fld(uv,t);
+      float wx=fld(uv+e.xy,t)-w0, wy=fld(uv+e.yx,t)-w0;
+      /* touch rings */
+      float ringSum=0.0;
+      for(int i=0;i<6;i++){
+        vec3 r=uRings[i];
+        if(r.z<0.0)continue;
+        float age=uTime-r.z;
+        if(age<0.0||age>3.0)continue;
+        vec2 d2=(uv-r.xy)*vec2(uAspect,1.0);
+        float d=length(d2);
+        float rad=age*0.10;
+        ringSum+=sin((d-rad)*70.0)*exp(-abs(d-rad)*34.0)*exp(-age*1.5);}
+      /* the shore's water is calm and shallow, so a touch has to read louder
+         here than it did out on the open sea */
+      vec2 n=vec2(wx,wy)*1.6+vec2(ringSum)*2.1;
+      vec2 duv=uv+n*0.0078*depth;
+      duv.y=max(duv.y,uHorizon+0.002);
+      vec3 col=texture2D(uTex,depth>0.001?duv:uv).rgb;
+      /* sun glimmer: slopes catching the low sun along its reflection column */
+      float colMask=exp(-pow((uv.x-uSun.x)*4.2,2.0));
+      float slope=max(wx*2.2+ringSum*1.4,0.0);
+      float glint=pow(slope,2.2)*depth*(0.10+0.75*colMask);
+      /* fine sparkle — round glints, breathing */
+      vec2 gcell=uv*vec2(340.0,220.0)+vec2(t*1.4,t*0.5);
+      vec2 gp=floor(gcell);
+      float sp=fract(sin(dot(gp,vec2(12.9898,78.233)))*43758.5453);
+      float gd=length(fract(gcell)-0.5);
+      float twinkle=0.5+0.5*sin(t*3.0+sp*40.0);
+      glint+=step(0.996,sp)*smoothstep(0.42,0.0,gd)*twinkle*depth*(0.22+0.9*colMask);
+      col+=vec3(1.0,0.74,0.46)*glint*0.85;
+      gl_FragColor=vec4(col,1.0);}`;
+  function sh(t,src){const o=gl.createShader(t);gl.shaderSource(o,src);gl.compileShader(o);
+    if(!gl.getShaderParameter(o,gl.COMPILE_STATUS)){return null;}return o;}
+  const vs=sh(gl.VERTEX_SHADER,VS),fs=sh(gl.FRAGMENT_SHADER,FS);
+  if(!vs||!fs)return;
+  const pr=gl.createProgram();gl.attachShader(pr,vs);gl.attachShader(pr,fs);gl.linkProgram(pr);
+  if(!gl.getProgramParameter(pr,gl.LINK_STATUS))return;
+  gl.useProgram(pr);
+  const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+  gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+  const aP=gl.getAttribLocation(pr,'aP');gl.enableVertexAttribArray(aP);
+  gl.vertexAttribPointer(aP,2,gl.FLOAT,false,0,0);
+  const U=n=>gl.getUniformLocation(pr,n);
+  const uTime=U('uTime'),uHor=U('uHorizon'),uShr=U('uShore'),uScl=U('uScale'),uOff=U('uOff'),
+        uSun=U('uSun'),uAsp=U('uAspect'),uR=[...Array(6)].map((_,i)=>U('uRings['+i+']'));
+  let conf=null,texA=1,ready=false;
+  const tex=gl.createTexture();
+  function loadTex(){
+    conf=isPortrait()?CONF.tall:CONF.wide;texA=conf.texA;
+    const im=new Image();im.src=conf.src;
+    im.onload=()=>{gl.bindTexture(gl.TEXTURE_2D,tex);
+      gl.texImage2D(gl.TEXTURE_2D,0,gl.RGB,gl.RGB,gl.UNSIGNED_BYTE,im);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+      ready=true;cv.classList.add('on');};}
+  loadTex();
+  addEventListener('resize',()=>{const was=conf===CONF.tall;
+    if(was!==isPortrait())loadTex();});
+  const rings=[...Array(6)].map(()=>({x:0,y:0,t:-9}));let ri=0;
+  function dropRing(cx,cy){
+    const r=cv.getBoundingClientRect();
+    const u=(cx-r.left)/r.width,v=(cy-r.top)/r.height;
+    const canA=r.width/r.height;let sx,sy,ox,oy;
+    if(canA>texA){sx=1;sy=texA/canA;}else{sx=canA/texA;sy=1;}
+    ox=(1-sx)/2;oy=(1-sy)/2;
+    const tu=u*sx+ox,tv=v*sy+oy;
+    if(!conf||tv<conf.horizon)return;
+    rings[ri]={x:tu,y:tv,t:performance.now()/1000};ri=(ri+1)%6;}
+  addEventListener('pointerdown',e=>{if(worldIdx===1&&mode==='world')dropRing(e.clientX,e.clientY);});
+  let lastMove=0;
+  addEventListener('pointermove',e=>{const n=performance.now();
+    if(worldIdx===1&&mode==='world'&&n-lastMove>300){lastMove=n;dropRing(e.clientX,e.clientY);}});
+  /* ambient drops so the water lives untouched */
+  setInterval(()=>{if(mode!=='world'||worldIdx!==1||!ready)return;
+    const r=cv.getBoundingClientRect();
+    dropRing(r.left+r.width*(0.2+Math.random()*0.6),
+             r.top+r.height*(0.55+Math.random()*0.35));},2800);
+  function frame(){
+    requestAnimationFrame(frame);
+    if(!ready||!document.getElementById('ch-sea').classList.contains('on'))return;
+    const dpr=Math.min(devicePixelRatio,1.5);
+    const w=Math.round(cv.clientWidth*dpr),h=Math.round(cv.clientHeight*dpr);
+    if(cv.width!==w||cv.height!==h){cv.width=w;cv.height=h;gl.viewport(0,0,w,h);}
+    const canA=cv.clientWidth/cv.clientHeight;let sx,sy;
+    if(canA>texA){sx=1;sy=texA/canA;}else{sx=canA/texA;sy=1;}
+    gl.uniform2f(uScl,sx,sy);gl.uniform2f(uOff,(1-sx)/2,(1-sy)/2);
+    gl.uniform1f(uTime,performance.now()/1000);
+    gl.uniform1f(uHor,conf.horizon);
+    gl.uniform1f(uShr,conf.shore);
+    gl.uniform2f(uSun,conf.sun[0],conf.sun[1]);
+    gl.uniform1f(uAsp,texA);
+    for(let i=0;i<6;i++)gl.uniform3f(uR[i],rings[i].x,rings[i].y,rings[i].t);
+    gl.drawArrays(gl.TRIANGLES,0,3);}
+  frame();
+})();
+
+
+/* ============ the apparitions — goddesses drift through the transitions ====
+   Only photos that actually load join the pool, so slot 3 waits quietly for
+   its file (apparition-3.webp). They spawn ONLY during the scrub drifts. */
+(function(){
+  const wrap=document.getElementById('ghosts');if(!wrap)return;
+  const pool=[];
+  ['assets/apparition-1.webp','assets/apparition-2.webp',
+   'assets/apparition-3.webp'].forEach(s=>{
+    const im=new Image();im.onload=()=>pool.push(s);im.src=s;});
+  /* NEVER on the black void (title/choice) and never while the red door
+     is still shut: in the first scrub they appear only once the door has
+     opened (~45% in); the later drifts are theirs from the first frame */
+  function inDrift(){
+    if(mode==='scrub')return !!video.duration&&scrubT>video.duration*0.45;
+    return mode==='scrub2'||mode==='scrub3'||mode==='scrub4';}
+  function spawn(){
+    if(pool.length&&inDrift()){
+      const g=document.createElement('img');g.className='ghost';g.alt='';
+      g.src=pool[Math.floor(Math.random()*pool.length)];
+      g.style.left=(18+Math.random()*64)+'%';
+      g.style.top=(24+Math.random()*46)+'%';
+      g.style.setProperty('--gr0',(Math.random()*24-12).toFixed(1)+'deg');
+      g.style.setProperty('--gr1',(Math.random()*24-12).toFixed(1)+'deg');
+      g.style.setProperty('--gt',(3.4+Math.random()*2.4).toFixed(2)+'s');
+      g.style.setProperty('--go',(.24+Math.random()*.14).toFixed(2));
+      g.addEventListener('animationend',()=>g.remove());
+      wrap.appendChild(g);}
+    setTimeout(spawn,2400+Math.random()*3200);}
+  setTimeout(spawn,1200);
+})();
+
+/* ============ the memory set — Diana's real photographs, one system ========
+   Every photo from ~/Downloads/dianaland-polaroids (4 realm subfolders) is
+   webp'd into assets/pol/ and listed here — ALL of them float as
+   flippable polaroids in their realm, and the door burst deals a random
+   hand from the full deck on every visit. To add photos: drop the file in
+   pol/, append its name to its realm below.
+
+   BACKS: MEM_CAPS below is generated — it is the only block in this file
+   written by a tool. Diana fills in jointheparty.ai/for/diana/, and
+   `node tools/pull-intake.mjs` rewrites everything between the two markers
+   from her answers. Hand-edits inside the markers get overwritten on the
+   next pull; edit her answer instead. A photo with no entry keeps CAP. */
+const CAP='Diana’s caption lands here — one line, in her own hand.';
+/* MEM_CAPS:START — generated by tools/pull-intake.mjs, do not hand-edit */
+const MEM_CAPS = {
+  'forest-01': 'Rare footage of a female lioness in human form',
+  'forest-03': 'Embodying a woodland nymph on my birthday last year at A beautiful retreat in the Catskills, surrounded by love and nature',
+  'funhouse-01': 'somewhere in a woods in Atlanta.. and I mean somewhere..we were totally lost for an hour after leaving a music festival',
+  'funhouse-02': 'Just swinging on a pole in Astoria..',
+  'funhouse-05': 'Studio in N.C where impromptu magic was made! A whole vibe that night',
+  'funhouse-06': 'When attending Empire of the Sun, one must dress accordingly',
+  'funhouse-07': 'Juve .. 2024, after I decided not to entertain men of lesser caliber any longer',
+  'funhouse-08': 'Before the Missy Elliot concert, while posing for this picture, a driver got distracted and crashed right into me.. poor car',
+  'funhouse-10': 'Taken Under a darkened bridge in Queens, where strange things float',
+  'pool-001': 'Messing around in the sea of Jamaica',
+  'pool-002': 'This is the flyer of a play I produced, directed and starred in.. one of the best times of my life, incredible cast, so much fun, truly a moment in time',
+  'pool-004': 'Playing my cards right at Alice in Wonderland pop-up exhibit in New York',
+  'pool-005': 'Neon dreams in wonderland',
+  'pool-009': 'Watching the sunset in my first night in San Salvador most beautiful place',
+  'pool-010': '.Sunset and San Salvador',
+  'pool-011': 'A mermaid washes up on the shores of San Salvador',
+  'pool-012': 'On the black volcanic sand of San Salvador, two girls and a red dress did and elaborate impromptu photo shoot and became best friends in the process',
+  'pool-015': 'Made it to the top of Machu Picchu. What a powerful place.',
+  'pool-017': 'Watching the sunset over Lima, Peru. A transformative trip to be revisited',
+  'pool-020': 'Taken on a solo birthday trip to Dominican Republic by kind strange lady in 2025 not 1988 as the picture would suggest',
+  'pool-021': '. Jessica did a little digging. I’m afraid.',
+  'pool-022': 'Having against my better judgement, taken a bite from an apple, presented to me by an old lady with long nose and a whicker basket',
+  'pool-023': 'Tree stoned  in queens',
+  'pool-025': 'Emerging from hibernation somewhere in Jersey :)',
+  'pool-027': 'Under a sacred tree in the Cotswolds, telling secrets',
+  'pool-028': 'Taken in the fairy forest in Monaghan, Ireland',
+  'pool-029': 'The view from my roof reminds me that I am so blessed',
+  'pool-030': 'The Spectacular waters of Hollywood Beach in Fort Lauderdale',
+  'pool-031': '\'nothing about any West Coast Apartment they found Jeffery in bed',
+  'pool-036': 'Food for thought..',
+  'pool-037': 'Hanging out to long, with this bush in the Dominican Republic because we matched outfits',
+  'pool-039': 'This is the back of my home place in Ireland.. always takes my breath away.',
+  'pool-040': 'Out for a walk with demon the dog RIP . He was a legend',
+  'pool-041': 'The otherside of my lake back in Ireland.. haunting beautiful and full of memories of many adventures as a child and as the child I still am :)',
+  'pool-042': 'The final ceremony of yoga teacher training, one of the most important and life altering things I’ve ever done.. forever grateful to my teachers',
+  'pool-045': 'Presenting myself to the Caribbean Sea.. as one should when meeting such a body of water',
+  'pool-046': 'Jamaica Jamaica!!',
+  'pool-048': 'My little abide for a week in the mountains of Jamaica, natures noises,  bursting day and night',
+  'pool-052': 'This picture, taken on playa de Blanca beach in Panama, became the artwork for OOH-WEE',
+  'pool-053': 'Walking the suspension bridge in Panama!',
+  'pool-054': 'Being extra on the suspension bridge in Panama!!',
+  'pool-060': 'Practicing headstand .. it took me a long time to achieve this pose, it taught me perseverance and that every day is different in your body..',
+  'pool-066': 'A quiet moment in Socrates park, Astoria, a magical day spent with magical people, start to finish.',
+  'pool-069': 'On my way to climb an active volcano in San Salvador',
+  'pool-070': 'My birthday this year, spent in the Catskills at acpractice your magic retreat! . My beautiful friends make me a flower crown, one of my favored birthdays ever',
+  'pool-073': 'This picture captures nothing of the magnitude of that waterfall.. it was like being touched by the hand of Mother Nature..',
+  'pool-074': 'In the Chinese gardens of snug harbor, Staten Island',
+  'pool-081': 'Aurora borealis above my home in Ireland looks unreal',
+  'pool-086': 'The top of a hill overlooking the ocean in San Salvador.. this trip was very spiritual for me',
+  'sea-03': 'A still shot from the video of OOH-WEE we nicknamed this character “miss wet” for obvious reasons :)',
+  'sea-04': 'Riding into the sky.. Panama and my trusty steed Corozon ❤️',
+  'sea-09': 'On a beach in Turkey after walking in from the boats ..I fell to my knees in gratitude 😏',
+  'temple-03': 'A sacred sunset moment atop a mountain overlooking the ocean In Peru, a truly magical experience',
+  'temple-04': 'Taken in Turkey while on an adventure with family and friends',
+  'temple-06': 'This is the vessel in which I was trapped for many years, until one day it was unknowingly polished by a handsome stranger ;) 🇹🇷',
+  'temple-08': 'I had just completed a 7 day silent meditation retreat and led yoga on New Year’s Day as the sun broke over the ocean of Miami Beach',
+};
+/* MEM_CAPS:END */
+/* DIANA'S 8/22 PASS. She wrote "Delete" on the back of 16 photos and moved
+   one realm to realm — those calls are applied here, and only here. The
+   .webp files all STAY in assets/pol/ (deleting them would make her
+   changing her mind a re-export); a photo is in the world if and only if it
+   is named below. Deleted: forest 02/04/05/06 · sea 01/05/06/07/08 ·
+   funhouse 03/04/09 · temple 01/02/05/07. Moved: funhouse-01 → the forest
+   ("(Move to WOODS)… somewhere in a woods in Atlanta").
+   Her sorting rule for the album still to come: sunsets and yoga → temple,
+   trees → forest, ocean and beach → sea, the kooky costume nights →
+   funhouse. Drop new files in pol/ and add the name to its realm.
+
+   REALM_PHOTOS is which photo BELONGS to which realm. That is separate from
+   whether the photo FLOATS there (see MEM_SETS below): the temple keeps its
+   photographs and shows none of them on its floor. */
+/* REALM_PHOTOS:START — `python3 tools/add-polaroids.py` appends to this block.
+
+   Every photograph in the world, sorted to the scene it belongs to. Diana's
+   own rule, in her words (intake 8/23): sunsets and yoga -> temple, trees ->
+   forest, ocean and beach -> sea, the kooky nights -> funhouse. The 84 she
+   sent on 8/24 arrived in one folder with no categories and were sorted here
+   BY EYE against that rule (Lauren 8/24: "are you able to intelligently sort
+   all 84?"). Any single call is one line to change — the number after
+   `pool-` is stable and never reused.
+
+   Hand-edits inside the markers survive until the next tool run, which only
+   ever APPENDS what it finds new on disk; a photo taken out here stays out.
+   POOL_PHOTOS is now empty by design: nothing is unsorted any more. */
+const REALM_PHOTOS={
+  'ch-forest':['forest-01','forest-03','funhouse-01','pool-008',
+               'pool-014','pool-022','pool-023','pool-025','pool-027',
+               'pool-028','pool-037','pool-039','pool-040','pool-041',
+               'pool-046','pool-048','pool-053','pool-054','pool-055',
+               'pool-063','pool-066','pool-069','pool-070','pool-073',
+               'pool-074','pool-086'],
+  'ch-sea':['sea-03','sea-04','sea-09','pool-001','pool-009',
+            'pool-010','pool-011','pool-012','pool-016','pool-020',
+            'pool-021','pool-026','pool-030','pool-031','pool-044',
+            'pool-047','pool-049','pool-050','pool-051','pool-056',
+            'pool-057','pool-058','pool-064','pool-087','pool-077'],
+  'ch-funhouse':['funhouse-02','funhouse-05','funhouse-06','funhouse-07',
+                 'funhouse-08','funhouse-10','pool-002','pool-003',
+                 'pool-004','pool-005','pool-006','pool-007','pool-013',
+                 'pool-018','pool-019','pool-024','pool-032','pool-033',
+                 'pool-034','pool-035','pool-038','pool-043','pool-059',
+                 'pool-061','pool-062','pool-065','pool-067','pool-068',
+                 'pool-072','pool-075','pool-076','pool-080','pool-082',
+                 'pool-083','pool-084'],
+  'ch-temple':['temple-03','temple-04','temple-06','temple-08',
+               'pool-015','pool-017','pool-029','pool-036','pool-042',
+               'pool-045','pool-052','pool-060','pool-071','pool-081',
+               'pool-085']};
+/* ON DISK BUT DELIBERATELY UNUSED — pool-078 and pool-079. Not oversights:
+   078 is an Instagram story screenshot (app chrome, two @handles, a "UBS
+   ARENA" location tag baked into the pixels) and 079 is a Pinterest
+   screenshot (browser URL bar, status bar, filename strip). Both are exactly
+   what Diana asked to be rid of on 8/23 — "can we crop the boarders on the
+   photos so they look more like poloroids" — and no square crop saves either.
+   Add either name to a realm above and it comes straight back.
+   (pool-077 was held for a different reason, a semi-nude; Lauren cleared it
+   on 8/24 and it is in ch-sea.) */
+const POOL_PHOTOS=[];
+/* REALM_PHOTOS:END */
+/* What floats as a polaroid in each realm. LAUREN 8/24: the temple floats
+   NOTHING — its photographs live in the red book and nowhere else, so the
+   quiet room stays quiet. Every other realm still deals three at random on
+   each visit. (An empty list simply builds no polaroids; MEM_SPOTS
+   ['ch-temple'] is now unused and kept only so the realm still has spots if
+   it is ever put back.) */
+const MEM_SETS={...REALM_PHOTOS,'ch-temple':[]};
+/* Where the square window sits on each photo, so the crop keeps the subject
+   and drops the Instagram chrome. Tuned by eye against every surviving
+   photo (8/24); a photo with no entry uses the CSS default of 50% 38%. */
+const POL_POS={
+  'forest-01':'50% 30%','forest-03':'50% 46%','funhouse-01':'52% 26%',
+  'sea-03':'50% 44%','sea-04':'50% 34%','sea-09':'46% 52%',
+  'funhouse-02':'50% 44%','funhouse-05':'50% 40%','funhouse-06':'50% 40%',
+  'funhouse-07':'50% 38%','funhouse-08':'50% 46%','funhouse-10':'50% 46%',
+  'temple-03':'50% 58%','temple-04':'50% 34%','temple-06':'50% 46%',
+  'temple-08':'50% 46%'};
+/* per-realm float spots (index-matched to MEM_SETS, picked around each
+   scene's hotspots); extras beyond the list fall back to a scatter rule */
+const MEM_SPOTS={
+  'ch-forest':[{l:'8%',t:'15%',r:-6},{l:'84%',t:'30%',r:5},{l:'42%',t:'33%',r:-3},
+    {l:'10%',t:'64%',r:4},{l:'56%',t:'58%',r:-4},{l:'92%',t:'62%',r:3}],
+  'ch-sea':[{l:'5%',t:'10%',r:5},{l:'70%',t:'12%',r:-5},{l:'86%',t:'48%',r:3},
+    {l:'5%',t:'56%',r:-4},{l:'30%',t:'40%',r:3},{l:'40%',t:'16%',r:-5},
+    {l:'68%',t:'34%',r:4},{l:'82%',t:'72%',r:-3},{l:'26%',t:'62%',r:5}],
+  'ch-funhouse':[{l:'12%',t:'6%',r:-5},{l:'67%',t:'28%',r:4},{l:'30%',t:'62%',r:-2},
+    {l:'44%',t:'24%',r:5},{l:'88%',t:'6%',r:-4},{l:'38%',t:'46%',r:3},
+    {l:'70%',t:'52%',r:-5},{l:'80%',t:'58%',r:4},{l:'8%',t:'78%',r:-3},{l:'58%',t:'26%',r:2}],
+  /* DIANA 8/23: "Temple: can photos be in a book. If not I would move the
+     Polaroid from the center." Both, in the end — the red book on the shelf
+     is now a real photo album (bookRoom below), AND the three floating
+     spots were pulled off the centre axis so the candle, the dawn and the
+     shelf are never covered. Nothing sits between 30% and 66% across. */
+  'ch-temple':[{l:'10%',t:'20%',r:4},{l:'74%',t:'26%',r:-4},{l:'14%',t:'58%',r:2},
+    {l:'78%',t:'60%',r:-3},{l:'22%',t:'8%',r:5},{l:'70%',t:'8%',r:-5},
+    {l:'8%',t:'74%',r:3},{l:'80%',t:'42%',r:-4}]};
+/* THE WHOLE DECK — every photograph in the world: the scene-assigned ones
+   plus the unsorted pool. The door burst, the funhouse mirror ghosts, the
+   floating polaroids and the index's Photographs grid all deal from here. */
+const DECK=[].concat(...Object.values(REALM_PHOTOS),POOL_PHOTOS);
+const ALL_MEMS=DECK.map(n=>'assets/pol/'+n+'.webp');
+/* Each realm floats THREE polaroids at a time, dealt fresh from its own set
+   on every visit — with 24 to 35 photographs per scene now, a refresh is a
+   different three almost every time.
+
+   The temple is the exception and floats NOTHING (Lauren 8/24: "remove the
+   polaroids entirely from the landing"). Its 15 photographs live in the red
+   book instead. MEM_SETS['ch-temple'] is empty, and an empty own-list means
+   the builder skips the realm entirely.
+
+   POOL_PHOTOS is empty now that every photograph is sorted to a scene, but
+   the concat is kept: it is the landing place for the next bulk drop that
+   arrives uncategorised, and it costs nothing while the array is empty. */
+/* Shrink a polaroid back's handwriting until the caption fits inside the
+   card. Steps down 5% at a time and stops the instant it clears, so short
+   captions keep the full size and only the long ones pay. The floor is 0.62
+   — past that it stops being handwriting and starts being a smudge; nothing
+   Diana has written comes close to needing it (the worst, at 159 characters,
+   lands around 0.90). overflow:hidden on .back is the backstop if it ever
+   does. */
+function fitBack(back){
+  if(!back)return;
+  back.style.setProperty('--fit','1');
+  let f=1;
+  while(back.scrollHeight>back.clientHeight&&f>0.62){
+    f-=0.05;
+    back.style.setProperty('--fit',f.toFixed(2));
+  }
+}
+const shuffled=a=>{const x=a.slice();
+  for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));
+    const t=x[i];x[i]=x[j];x[j]=t;}
+  return x;};
+(function(){
+  Object.keys(MEM_SETS).forEach((id,si)=>{
+    const sec=document.getElementById(id);if(!sec)return;
+    const own=MEM_SETS[id];
+    if(!own.length)return;                 /* the temple: deliberately bare */
+    /* a 12-card hand: this scene's own photographs plus a fresh cut of the
+       pool, shuffled together, three of which get dealt onto the floor. */
+    const pool=shuffled(shuffled(own).concat(shuffled(POOL_PHOTOS)).slice(0,12));
+    /* small screens (portrait phones AND rotated phones): the pill needs
+       clear air — keep every polaroid below it and inside the right edge */
+    const PT=matchMedia('(orientation: portrait)').matches;
+    const SL=matchMedia('(orientation: landscape) and (max-height: 520px)').matches;
+    pool.slice(0,3).forEach((name,i)=>{
+      const src='assets/pol/'+name+'.webp';
+      const s=MEM_SPOTS[id][i]||{l:(10+((i*29)%78))+'%',t:(8+((i*37)%60))+'%',r:(i%2?5:-5)};
+      let l=s.l,t=s.t;
+      if(PT&&parseFloat(t)<20)t=(20+i*7)+'%';
+      if(SL&&parseFloat(t)<26)t=(26+i*8)+'%';
+      if((PT||SL)&&parseFloat(l)>72)l='72%';
+      const b=document.createElement('button');
+      b.className='mempol s'+(i%3);b.style.left=l;b.style.top=t;
+      b.style.setProperty('--pr',s.r+'deg');
+      b.style.animationDelay=(-(si*3+i)*1.13)+'s';
+      b.setAttribute('aria-label','A polaroid floats here — touch it to read the memory');
+      b.innerHTML='<span class="flip"><span class="face front"><img alt=""></span>'+
+        '<span class="face back"><h4></h4><p></p></span></span>';
+      const img=b.querySelector('img');
+      img.onerror=()=>{img.onerror=null;b.style.display='none';};
+      if(POL_POS[name])img.style.objectPosition=POL_POS[name];
+      img.src=src;
+      b.querySelector('h4').textContent='a memory';
+      b.querySelector('p').textContent=MEM_CAPS[name]||CAP;
+      b.addEventListener('click',e=>{e.stopPropagation();shutter();
+        const opening=!b.classList.contains('flipped');
+        /* one at a time — two open backs overlapping is unreadable */
+        if(opening)sec.querySelectorAll('.mempol.flipped').forEach(o=>{
+          if(o!==b){o.classList.remove('flipped');o.style.left=o.dataset.homeL;
+            fitBack(o.querySelector('.back'));}});
+        b.classList.toggle('flipped');
+        if(opening){
+          /* it just got wider — keep it on screen, then re-measure */
+          const r=b.getBoundingClientRect();
+          if(r.right>innerWidth-8)
+            b.style.left=Math.max(4,innerWidth-r.width-12)+'px';
+        }else b.style.left=b.dataset.homeL;
+        fitBack(b.querySelector('.back'));});
+      b.dataset.homeL=l;
+      sec.appendChild(b);
+      fitBack(b.querySelector('.back'));});});
+  /* the card is sized in vmin, so a resize changes what fits */
+  let fitT=null;
+  addEventListener('resize',()=>{clearTimeout(fitT);
+    fitT=setTimeout(()=>document.querySelectorAll('.mempol .back').forEach(fitBack),180);});
+  /* the display face is a webfont — measuring before it lands measures the
+     fallback, and the answer changes when it swaps in */
+  if(document.fonts&&document.fonts.ready)
+    document.fonts.ready.then(()=>document.querySelectorAll('.mempol .back').forEach(fitBack));
+})();
+
+/* ============ the polaroid burst — a random hand from the full deck ======== */
+const POLCFG=[{x:-38,y:-24,r:-24,d:0},{x:31,y:-30,r:18,d:.03},
+              {x:-27,y:19,r:14,d:.06},{x:37,y:23,r:-16,d:.09},
+              {x:-44,y:2,r:-8,d:.12},{x:44,y:-6,r:10,d:.05},
+              {x:-18,y:-32,r:20,d:.15},{x:18,y:30,r:-22,d:.12},
+              {x:-33,y:-8,r:6,d:.18},{x:33,y:9,r:-12,d:.16},
+              {x:-10,y:27,r:26,d:.20},{x:9,y:-27,r:-18,d:.21}];
+(function(){const wrap=document.querySelector('.pols');if(!wrap)return;
+  const deck=ALL_MEMS.slice();
+  for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));
+    const t=deck[i];deck[i]=deck[j];deck[j]=t;}
+  deck.slice(0,POLCFG.length).forEach(src=>{
+    const d=document.createElement('div');d.className='pol';
+    const im=document.createElement('img');
+    im.onerror=()=>{im.onerror=null;d.style.display='none';};
+    im.src=src;im.alt='';
+    d.appendChild(im);wrap.appendChild(d);});})();
+const POLS=[...document.querySelectorAll('.pol')];
+/* the burst is ONE event now: the moment the door swings open (~34% into
+   the scrub) all twelve pop out on their own clock - poof poof poof - a
+   fast overshoot-and-settle, a short float, then they let go. Scroll back
+   before the door and it re-arms. */
+let burstT0=0,burstRAF=0;
+function updatePols(p){
+  if(p>=0.34&&!burstT0){burstT0=performance.now();
+    shutter();
+    for(let k=0;k<5;k++)setTimeout(polWhoosh,k*95);  /* five fast whooshes */
+    cancelAnimationFrame(burstRAF);polsTick();}
+  else if(p<0.30&&burstT0){burstT0=0;cancelAnimationFrame(burstRAF);
+    POLS.forEach(el=>{el.style.opacity=0;});}}
+function polsTick(){
+  if(!burstT0)return;
+  const t=(performance.now()-burstT0)/1000;
+  let live=false;
+  POLS.forEach((el,i)=>{const c=POLCFG[i];if(!c)return;
+    let q=(t-i*0.07)/0.9;
+    if(q<=0){el.style.opacity=0;live=true;return;}
+    if(q<1)live=true;else q=1;
+    /* they don't settle — they fly straight OFF the screen and are gone.
+       2.8x the old targets carries every one well past the edges */
+    const e=1-Math.pow(1-q,2.4);
+    const fade=q<0.9?1:Math.max(0,1-(q-0.9)/0.1);
+    el.style.opacity=(Math.min(1,q*8)*fade).toFixed(3);
+    el.style.transform=`translate(-50%,-50%) translate(${(c.x*2.8*e).toFixed(2)}vw,${(c.y*2.8*e).toFixed(2)}vh) rotate(${(c.r*1.6*e).toFixed(1)}deg) scale(${(0.25+1.1*e).toFixed(3)})`;});
+  if(live)burstRAF=requestAnimationFrame(polsTick);}
+
+/* ============ forest voices — synthesized, no audio files ============ */
+let AC=null,lastGrowl=0,lastSpark=0,muted=false;
+function ac(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;
+  if(!C)return null;AC=new C();}
+  if(AC.state==='suspended'&&!muted)AC.resume().catch(()=>{});return AC;}
+/* the ORIGINAL first-pass music, lifted from V1's embedded soundscape
+   loops into assets/audio/. Diana's call: the original track plays
+   in the FOREST; the sea keeps its waves, the temple its bowls. (The
+   other original loops — sea/funhouse/temple/thread — sit in the same
+   folder, one line each to wire.) */
+const forestMusic=new Audio('assets/audio/forest-loop.mp3');
+forestMusic.loop=true;forestMusic.preload='auto';
+const funhouseMusic=new Audio('assets/audio/funhouse-loop.mp3');
+funhouseMusic.loop=true;funhouseMusic.preload='auto';
+/* The lion finally has his voice: Diana's own recording, "Come My Lion".
+   preload='none' — it is 2 MB and must never compete with the door video
+   for bandwidth on arrival; it loads when someone touches the lion. It is
+   NOT looped: the song ends and the forest comes back. */
+const lionSong=new Audio('assets/audio/come-my-lion.mp3');
+lionSong.preload='none';
+/* THE LOVE SONG (Diana, intake 8/22): "Come away with me by Norah jones.
+   Can we just use the audio please. I would like to be able to change this
+   song every so often."
+   RESOLVED THE BEST WAY, 8/24: one of the videos in her photo album is HER
+   singing it, 2:52 straight to camera. So the heart plays Diana, not Norah
+   Jones's master — no licence to hold, and a singer's site plays the singer.
+   The audio is lifted from that file; the video itself is not on the
+   television any more, which is what she asked for.
+   Changing the song is still this one constant plus a file — nothing else in
+   the page knows the title. */
+const LOVE_SONG={file:'assets/audio/love-song.mp3',
+  title:'Come Away With Me',artist:'sung by Diana'};
+const loveSong=new Audio(LOVE_SONG.file);
+loveSong.preload='none';
+let songOn=false;
+/* a press clip is playing: the realm loops duck under it and come back */
+let clipOn=false;
+/* keep unlocking on every tap until sound actually flows — one flaky
+   first gesture (or iOS being iOS) must never leave the world silent */
+function audioUnlock(){ac();ambientInit();
+  if(forestMusic.paused)forestMusic.play().catch(()=>{});
+  if(funhouseMusic.paused)funhouseMusic.play().catch(()=>{});
+  if(AC&&AC.state==='running'&&!forestMusic.paused&&!funhouseMusic.paused&&!muted)
+    removeEventListener('pointerdown',audioUnlock);}
+addEventListener('pointerdown',audioUnlock);
+/* ONE clear switch for all sound — it suspends the whole AudioContext */
+(function(){const b=document.getElementById('mute-btn');
+  b.addEventListener('click',e=>{e.stopPropagation();muted=!muted;
+    b.classList.toggle('muted',muted);
+    b.setAttribute('aria-label',muted?'Sound off — tap to unmute':'Sound on — tap to mute');
+    if(!AC)return;
+    if(muted)AC.suspend().catch(()=>{});else AC.resume().catch(()=>{});});})();
+function growl(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastGrowl<1500)return;lastGrowl=n;
+  const t=c.currentTime,dur=1.3;
+  const buf=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const src=c.createBufferSource();src.buffer=buf;
+  const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=130;lp.Q.value=8;
+  const trem=c.createGain();trem.gain.value=.6;
+  const lfo=c.createOscillator();lfo.frequency.value=26;
+  const lg=c.createGain();lg.gain.value=.4;lfo.connect(lg);lg.connect(trem.gain);
+  const env=c.createGain();env.gain.setValueAtTime(0,t);
+  env.gain.linearRampToValueAtTime(.9,t+.2);      /* the lion speaks UP now */
+  env.gain.setValueAtTime(.72,t+.7);env.gain.linearRampToValueAtTime(0,t+dur);
+  src.connect(lp);lp.connect(trem);trem.connect(env);env.connect(c.destination);
+  lfo.start(t);lfo.stop(t+dur);src.start(t);src.stop(t+dur);}
+function sparkle(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastSpark<900)return;lastSpark=n;
+  const t=c.currentTime;
+  [1568,1976,2349,2960,3520].forEach((f,i)=>{
+    const o=c.createOscillator();o.type='sine';
+    o.frequency.value=f*(1+(Math.random()-.5)*.012);
+    const g=c.createGain();const s=t+i*.055+Math.random()*.02;
+    g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(.07,s+.012);
+    g.gain.exponentialRampToValueAtTime(.0001,s+.55);
+    o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+.6);});}
+
+
+/* ============ ambient beds — gentle surf + tibetan bowls (synth, no files) ====
+   the forest crickets were CUT at Diana's 8/20 pass — and deliberately not
+   moved to the sea or the temple; those realms keep their own voices */
+let ambient=null;
+function ambientInit(){const c=ac();if(!c)return null;if(ambient)return ambient;
+  const mk=()=>{const g=c.createGain();g.gain.value=0;g.connect(c.destination);return g;};
+  const sea=mk(),temple=mk(),music=mk(),fmusic=mk(),song=mk();
+  /* the original tracks ride the WebAudio graph, so the mute switch and
+     the realm crossfades govern them like everything else */
+  try{c.createMediaElementSource(forestMusic).connect(music);}catch(e){}
+  try{c.createMediaElementSource(funhouseMusic).connect(fmusic);}catch(e){}
+  try{c.createMediaElementSource(lionSong).connect(song);}catch(e){}
+  try{c.createMediaElementSource(loveSong).connect(song);}catch(e){}
+  /* very light surf: looped brown noise through a low filter, swelling slowly */
+  const len=4*c.sampleRate,buf=c.createBuffer(1,len,c.sampleRate);
+  const d=buf.getChannelData(0);let last=0;
+  for(let i=0;i<len;i++){const w=Math.random()*2-1;last=(last+.02*w)/1.02;d[i]=last*3.5;}
+  const surf=c.createBufferSource();surf.buffer=buf;surf.loop=true;
+  const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=520;
+  const swell=c.createGain();swell.gain.value=.55;
+  const lfo=c.createOscillator();lfo.frequency.value=.09;
+  const lg=c.createGain();lg.gain.value=.35;lfo.connect(lg);lg.connect(swell.gain);
+  surf.connect(lp);lp.connect(swell);swell.connect(sea);surf.start();lfo.start();
+  ambient={sea,temple,music,fmusic,song,templeOn:false};
+  /* tibetan bowls: a struck bowl is three inharmonic partials, each doubled
+     by a hair-detuned twin so the tone shimmers/beats as it rings out */
+  function bowl(){
+    if(ambient.templeOn&&c.state==='running'){
+      const t=c.currentTime;
+      const F=[110,98,130.8,146.8];   /* a small choir of bowls */
+      const f0=F[Math.floor(Math.random()*F.length)]*(1+(Math.random()-.5)*.012);
+      [[1,.5],[2.72,.2],[4.9,.07]].forEach(([h,a])=>{
+        const g=c.createGain();
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a,t+.05);
+        g.gain.exponentialRampToValueAtTime(.0004,t+13);
+        g.connect(temple);
+        [1,1.0035].forEach(dt=>{const o=c.createOscillator();o.type='sine';
+          o.frequency.value=f0*h*dt;o.connect(g);o.start(t);o.stop(t+13);});});}
+    setTimeout(bowl,6500+Math.random()*6500);}   /* bowls come often now */
+  setTimeout(bowl,1800);
+  return ambient;}
+function ambientSet(which,on){const a=ambientInit();if(!a||!AC)return;
+  if(which==='temple')a.templeOn=on;
+  const g=a[which].gain;
+  const lvl=which==='temple'?.06:which==='music'?.4:which==='fmusic'?.35:
+    which==='song'?.85:.05;
+  g.cancelScheduledValues(AC.currentTime);
+  g.setTargetAtTime(on?lvl:0,AC.currentTime,1.2);}
+setInterval(()=>{if(!AC)return;
+  ambientSet('sea',mode==='world'&&worldIdx===1);
+  ambientSet('temple',mode==='world'&&worldIdx===3);
+  ambientSet('music',mode==='world'&&worldIdx===0&&!songOn&&!clipOn);
+  ambientSet('song',songOn);
+  ambientSet('fmusic',mode==='world'&&worldIdx===2&&!tvOpen&&!clipOn);},500);
+
+/* ============ touch voices — polaroids, mirrors, books, the drift ============ */
+/* camera shutter for every polaroid: a bright snap and the little "kh-chk" */
+let lastShut=0;
+function shutter(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastShut<180)return;lastShut=n;
+  const t=c.currentTime;
+  const mk=(dur,decay,freq,type,amp,when)=>{
+    const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+    const dd=b.getChannelData(0);
+    for(let i=0;i<dd.length;i++)dd[i]=(Math.random()*2-1)*Math.exp(-i/(c.sampleRate*decay));
+    const s=c.createBufferSource();s.buffer=b;
+    const f=c.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=2;
+    const g=c.createGain();g.gain.value=amp;
+    s.connect(f);f.connect(g);g.connect(c.destination);s.start(t+when);};
+  mk(.09,.012,1800,'highpass',.5,0);
+  mk(.05,.006,3200,'bandpass',.35,.07);}
+/* a soft airy whoosh whenever you drift from one realm toward the next */
+let lastWhoosh=0;
+function whoosh(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastWhoosh<800)return;lastWhoosh=n;
+  const t=c.currentTime,dur=1.15;
+  const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+  const dd=b.getChannelData(0);for(let i=0;i<dd.length;i++)dd[i]=Math.random()*2-1;
+  const s=c.createBufferSource();s.buffer=b;
+  const bp=c.createBiquadFilter();bp.type='bandpass';bp.Q.value=.8;
+  bp.frequency.setValueAtTime(220,t);
+  bp.frequency.exponentialRampToValueAtTime(900,t+dur*.5);
+  bp.frequency.exponentialRampToValueAtTime(260,t+dur);
+  const g=c.createGain();g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(.055,t+dur*.35);g.gain.linearRampToValueAtTime(0,t+dur);
+  s.connect(bp);bp.connect(g);g.connect(c.destination);s.start(t);s.stop(t+dur);}
+/* a short airy flick — the sound of one polaroid leaving the door.
+   No throttle: the burst fires five of them in under half a second */
+function polWhoosh(){const c=ac();if(!c||c.state!=='running')return;
+  const t=c.currentTime,dur=.38;
+  const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+  const dd=b.getChannelData(0);for(let i=0;i<dd.length;i++)dd[i]=Math.random()*2-1;
+  const s=c.createBufferSource();s.buffer=b;
+  const bp=c.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.2;
+  bp.frequency.setValueAtTime(480+Math.random()*160,t);
+  bp.frequency.exponentialRampToValueAtTime(2200+Math.random()*600,t+dur*.7);
+  const g=c.createGain();g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(.065,t+.04);g.gain.linearRampToValueAtTime(0,t+dur);
+  s.connect(bp);bp.connect(g);g.connect(c.destination);s.start(t);s.stop(t+dur);}
+/* a high glass ting when a mirror is touched */
+let lastTing=0;
+function glassTing(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastTing<900)return;lastTing=n;
+  const t=c.currentTime;
+  [2093,3136,5274].forEach((f,i)=>{const o=c.createOscillator();o.type='sine';
+    o.frequency.value=f*(1+(Math.random()-.5)*.006);
+    const g=c.createGain();const a=[.09,.05,.02][i];
+    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(a,t+.008);
+    g.gain.exponentialRampToValueAtTime(.0003,t+1.6);
+    o.connect(g);g.connect(c.destination);o.start(t);o.stop(t+1.6);});}
+/* pages flutter when the bookshelf lets its books go */
+let lastFlut=0;
+function pageFlutter(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastFlut<1200)return;lastFlut=n;
+  const t=c.currentTime;
+  for(let i=0;i<7;i++){const dur=.05;
+    const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+    const dd=b.getChannelData(0);
+    for(let j=0;j<dd.length;j++)dd[j]=(Math.random()*2-1)*Math.exp(-j/(c.sampleRate*.02));
+    const s=c.createBufferSource();s.buffer=b;
+    const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=1400+i*260;bp.Q.value=1.4;
+    const g=c.createGain();g.gain.value=.16;
+    s.connect(bp);bp.connect(g);g.connect(c.destination);s.start(t+i*.09);}}
+/* wax pop — the great candle crackles under the pointer */
+let lastPop=0;
+function candlePop(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastPop<1100)return;lastPop=n;
+  const t=c.currentTime,pops=2+Math.floor(Math.random()*2);
+  for(let i=0;i<pops;i++){const dur=.035;
+    const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+    const dd=b.getChannelData(0);
+    for(let j=0;j<dd.length;j++)dd[j]=(Math.random()*2-1)*Math.exp(-j/(c.sampleRate*.004));
+    const s=c.createBufferSource();s.buffer=b;
+    const bp=c.createBiquadFilter();bp.type='bandpass';
+    bp.frequency.value=520+Math.random()*480;bp.Q.value=1.8;
+    const g=c.createGain();g.gain.value=.22;
+    s.connect(bp);bp.connect(g);g.connect(c.destination);
+    s.start(t+i*(.12+Math.random()*.14));}}
+/* record scratch — READY for the record in the coming music room: call
+   recordScratch() from its click handler when that prop ships */
+let lastScr=0;
+function recordScratch(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastScr<1200)return;lastScr=n;
+  const t=c.currentTime,dur=.42;
+  const b=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+  const dd=b.getChannelData(0);for(let i=0;i<dd.length;i++)dd[i]=Math.random()*2-1;
+  const s=c.createBufferSource();s.buffer=b;s.playbackRate.setValueAtTime(1,t);
+  s.playbackRate.exponentialRampToValueAtTime(.32,t+dur);
+  const bp=c.createBiquadFilter();bp.type='bandpass';bp.Q.value=3;
+  bp.frequency.setValueAtTime(2600,t);bp.frequency.exponentialRampToValueAtTime(500,t+dur);
+  const g=c.createGain();g.gain.setValueAtTime(.22,t);
+  g.gain.linearRampToValueAtTime(0,t+dur);
+  s.connect(bp);bp.connect(g);g.connect(c.destination);s.start(t);s.stop(t+dur);}
+
+/* ============ hotspots -> rooms ============ */
+function openRoom(title,body){document.getElementById('roomcard').classList.remove('wide');
+  document.getElementById('room-title').textContent=title;
+  document.getElementById('room-body').textContent=body;room.classList.add('open');}
+/* same, but the body may carry a real link (booking etc.) */
+function openRoomHTML(title,html){document.getElementById('roomcard').classList.remove('wide');
+  document.getElementById('room-title').textContent=title;
+  document.getElementById('room-body').innerHTML=html;room.classList.add('open');}
+/* wide variant for grids and the television */
+function openRoomWide(title,html){openRoomHTML(title,html);
+  document.getElementById('roomcard').classList.add('wide');}
+function closeRoom(){room.classList.remove('open');
+  document.getElementById('roomcard').classList.remove('wide');
+  document.getElementById('room-body').innerHTML='';   /* kills any playing embed */
+  tvOpen=false;
+  /* only a song that BELONGS to a room dies with it; the lion's keeps going */
+  if(typeof songStop==='function'&&!songPersists)songStop();
+  clipOn=false;}
+document.getElementById('close').addEventListener('click',closeRoom);
+addEventListener('keydown',e=>{if(e.key==='Escape')closeRoom();});
+
+/* ============ her actual catalogue + platforms ============ */
+const TV_VIDS=[
+  {id:'S5ObdyMrzZ0',t:'Making the Video (part 1)'},
+  {id:'S3nDMlVkGAY',t:'Ooh-Wee (iHeartRadio)'},
+  {id:'a-oDuoEf-UA',t:'House of the Rising Sun (live)'},
+  {id:'2dxdXB-TewM',t:'I don’t care if it hurts…'},
+  {id:'-rkb1Z-mGwI',t:'Dark horse?'},
+  {id:'qMyp146qG88',t:'Live at Madame George'},
+  {id:'pnQPaaCvhPA',t:'Never know how much I love you…'}];
+/* Three videos arrived inside the 8/24 photo album. They are not polaroids,
+   and Lauren's call was that they belong on the television. Unlike TV_VIDS
+   these are HER files, served from this site — {f} instead of {id} is what
+   tells the player which kind it is holding. Re-encoded to a 1080 long edge
+   at ~1.2 Mbps, 25 MB for all three, preload="none" with a poster so the
+   channel costs nothing until someone turns it on. */
+const TV_FILES=[
+  {f:'nom-studios', t:'The vibe session at NOM Studios'},
+  {f:'iheartradio', t:'On the radio'},
+  {f:'koi',         t:'The koi pond'}];
+/* The third file from that album — her singing "Come Away With Me" — is NOT
+   here on purpose. Diana asked for the audio only, and it is the love song
+   hanging in the forest instead (LOVE_SONG above). */
+/* one channel, both kinds, and the shuffle does not care which is which */
+const TV_ALL=TV_VIDS.concat(TV_FILES);
+/* music platforms — every link VERIFIED as her actual page (Spotify
+   artist confirmed via oEmbed, Apple via the iTunes artist API; the
+   Amazon link is her verified track page — swap for her artist page if
+   Diana has the URL) */
+const MUSIC_LINKS=[
+  {n:'Spotify',u:'https://open.spotify.com/artist/4jXbRWNf3XWru3E6HQsYl1'},
+  {n:'Apple Music',u:'https://music.apple.com/us/artist/diana-harkin/1065537208'},
+  {n:'YouTube',u:'https://www.youtube.com/@welcometodianaland'},
+  {n:'Amazon Music',u:'https://www.amazon.com/Aint-That-Clever-Diana-Harkin/dp/B0192O93S4'}];
+const SOCIALS=[
+  {n:'Instagram',u:'https://www.instagram.com/welcometodianaland'},
+  {n:'Facebook',u:'https://www.facebook.com/welcometodianaland'},
+  {n:'Threads',u:'https://www.threads.net/@welcometodianaland'},
+  {n:'YouTube',u:'https://www.youtube.com/@welcometodianaland'},
+  {n:'TikTok',u:'https://www.tiktok.com/@welcometodianaland'}];
+/* Full-frame plates (Diana on the shore, the giant candle in the temple)
+   are welded to their base, so there is no button to position — we sample
+   the plate's actual alpha under the pointer instead. getBoundingClientRect()
+   carries the parallax and bob transforms for us, so this stays exact at
+   every aspect ratio. */
+function alphaHotspot(secId,imgSel,hotClass,widx,onTap,onHot){
+  const sec=document.getElementById(secId);
+  const img=document.querySelector(imgSel);
+  if(!sec||!img)return;
+  let map=null,mw=0,mh=0,mapSrc='';
+  function buildMap(){
+    const src=img.currentSrc||img.src;
+    if(!src||src===mapSrc)return;
+    const probe=new Image();probe.decoding='async';
+    probe.onload=()=>{const s=360/probe.naturalWidth;
+      mw=Math.max(1,Math.round(probe.naturalWidth*s));
+      mh=Math.max(1,Math.round(probe.naturalHeight*s));
+      const c=document.createElement('canvas');c.width=mw;c.height=mh;
+      const x=c.getContext('2d',{willReadFrequently:true});
+      x.drawImage(probe,0,0,mw,mh);
+      map=x.getImageData(0,0,mw,mh).data;mapSrc=src;};
+    probe.src=src;}
+  if(img.complete)buildMap();
+  img.addEventListener('load',buildMap);
+  addEventListener('resize',buildMap);
+  function hit(cx,cy){
+    if(!map||!img.naturalWidth)return false;
+    const r=img.getBoundingClientRect();
+    if(!r.width||!r.height)return false;
+    const s=Math.max(r.width/img.naturalWidth,r.height/img.naturalHeight);
+    const dw=img.naturalWidth*s,dh=img.naturalHeight*s;
+    /* honor the plate's object-position (the temple pans on portrait) */
+    const op=getComputedStyle(img).objectPosition.split(' ');
+    const fx=(parseFloat(op[0])||50)/100,fy=(parseFloat(op[1])||50)/100;
+    const u=(cx-r.left-(r.width-dw)*fx)/dw,v=(cy-r.top-(r.height-dh)*fy)/dh;
+    if(u<0||u>1||v<0||v>1)return false;
+    const px=Math.round(u*mw),py=Math.round(v*mh);
+    /* forgiving: a 3x3 neighborhood at a low threshold, so smoke gaps and
+       feathered edges still answer the finger */
+    for(const dx of[-2,0,2])for(const dy of[-2,0,2]){
+      const qx=Math.min(mw-1,Math.max(0,px+dx)),qy=Math.min(mh-1,Math.max(0,py+dy));
+      if(map[(qy*mw+qx)*4+3]>12)return true;}
+    return false;}
+  /* These two listeners are on the WINDOW, not on the section — an alpha
+     hotspot has no element of its own to bind to, it is a shape inside a
+     photograph. That means every pointerdown anywhere on the page reaches
+     here, including ones aimed at a button in an open room.
+
+     THE BUG THAT CAME FROM THAT (Diana/Lauren, 8/24): pressing "turn the
+     page" in the temple's photo album sometimes opened the candle poem
+     instead. The album's own handler calls stopPropagation, but only on
+     CLICK — this fires on POINTERDOWN, a different event, so it never saw
+     it. Whether it triggered depended on whether the button happened to sit
+     over an opaque pixel of the candle, which is exactly why it was
+     "sometimes". Same latent bug on the sea's She-Surfaces hotspot.
+
+     The scene is not interactive while a dialog is up, and UI chrome is
+     never the scene. */
+  const uiBusy=(e)=>
+    (room && room.classList.contains('open')) ||
+    !!(e.target && e.target.closest &&
+       e.target.closest('#room,#nav-hud,#mute-btn,button,a,input,textarea'));
+  const live=()=>mode==='world'&&worldIdx===widx;
+  let wasHot=false;
+  addEventListener('pointermove',e=>{
+    const hot=!uiBusy(e)&&live()&&hit(e.clientX,e.clientY);
+    sec.classList.toggle(hotClass,hot);
+    if(hot&&!wasHot&&onHot)onHot();
+    wasHot=hot;});
+  addEventListener('pointerdown',e=>{
+    if(uiBusy(e))return;
+    if(live()&&hit(e.clientX,e.clientY))onTap();});}
+alphaHotspot('ch-sea','#SH-diana img','diana-hot',1,()=>openRoom('She Surfaces',
+  'The sea holds her songs. A lyric will rise here, line by line, as the water breathes.'));
+/* the poem Diana chose for the candle (intake 8/23); she noted the author
+   as unknown, so it is credited that way rather than to her. */
+alphaHotspot('ch-temple','#T-candle img','candle-hot',3,()=>{openRoomHTML('A Candle Is Lit',
+  '<p class="poem">When we understand that each day is not one more day, '+
+  'but one less, we&rsquo;ll start giving more value to the things that '+
+  'truly matter.</p><p class="poem-by">&mdash; author unknown</p>'+
+  '<p>Keep still: dawn is close.</p>');
+  clearTimeout(window.__dawnT);window.__dawnT=setTimeout(dawn,15000);},candlePop);
+document.getElementById('lion-hot').addEventListener('pointerenter',growl);
+/* The lion is no longer a promise — he sings. Diana's own recording plays
+   in his room and the forest loop ducks under it; closing the room (X,
+   Escape, or navigating away) stops him mid-breath. */
+/* ONE song plays in Dianaland at a time, and closing its room ends it —
+   otherwise a visitor who wanders off leaves her singing to an empty
+   forest. `songOn` also ducks the realm loop (see the ambient interval). */
+let curSong=null,songPersists=false;
+function songStop(){songOn=false;songPersists=false;
+  if(curSong){try{curSong.pause();curSong.currentTime=0;}catch(e){}curSong=null;}}
+/* persist:true means the song is not tied to a dialog — it keeps playing
+   while you wander, and only its own control stops it (the lion, 8/24). */
+function songStart(el,persist){songStop();ac();ambientInit();
+  curSong=el;songOn=true;songPersists=!!persist;
+  try{el.currentTime=0;}catch(e){}
+  el.play().catch(()=>{songOn=false;curSong=null;songPersists=false;});}
+/* a room that plays one track: the button reflects reality, and a file that
+   isn't there (the love song, for now) says so instead of failing silently */
+function songRoom(title,blurb,el){
+  openRoomHTML(title,blurb+'<button class="room-cta" id="song-btn">stop the song</button>');
+  const btn=document.getElementById('song-btn');
+  const label=()=>{btn.textContent=songOn?'stop the song':'play it again';};
+  el.onended=()=>{songOn=false;curSong=null;label();};
+  el.onerror=()=>{songOn=false;curSong=null;
+    btn.textContent='the recording is not here yet';btn.disabled=true;};
+  songStart(el);label();
+  btn.addEventListener('click',e=>{e.stopPropagation();
+    if(songOn)songStop();else songStart(el);label();});}
+/* LAUREN 8/24: "clicking on the lion starts the song, clicking again stops
+   the song. no room to enter or exit. if song stops, forest sounds start
+   again." So the lion opens NOTHING. He is a switch, and the song follows
+   you out of the forest and through the whole world until you press him
+   again (or it ends on its own, 2:08 later). Stopping him drops songOn,
+   which is what the ambient crossfade reads to bring the forest loop back
+   up — see the interval below. */
+const lionHot=document.getElementById('lion-hot');
+lionHot.addEventListener('click',()=>{
+  const playing = songOn && curSong===lionSong;
+  if(playing){
+    songStop();
+    lionHot.setAttribute('aria-label',"A lion's shadow waits between the trees — touch him and he sings");
+  }else{
+    growl();
+    songStart(lionSong,true);
+    lionHot.setAttribute('aria-label','The lion is singing — touch him again for the forest');
+  }});
+/* he releases the forest when the song runs out on its own, too */
+lionSong.addEventListener('ended',()=>{songStop();
+  lionHot.setAttribute('aria-label',"A lion's shadow waits between the trees — touch him and he sings");});
+document.getElementById('heart-hot').addEventListener('pointerenter',sparkle);
+document.getElementById('heart-hot').addEventListener('click',()=>{sparkle();
+  songRoom('The Love Song',
+    '<p>A love song hangs here in glass. Tonight it is <em>'+LOVE_SONG.title+
+    '</em>, '+LOVE_SONG.artist+' &mdash; one take, straight to camera. '+
+    'It changes when she wants it to.</p>',
+    loveSong);});
+document.querySelectorAll('[data-todo]').forEach(a=>a.addEventListener('click',e=>{
+  e.preventDefault();openRoom('Coming Soon','This door is still being carved — it opens shortly.');}));
+document.querySelectorAll('[data-act]').forEach(a=>a.addEventListener('click',e=>{
+  e.preventDefault();
+  ({music:musicRoom,reel:reelRoom,photos:photosRoom,bio:bioRoom})[a.dataset.act]();}));
+
+/* ============ funhouse voices ============ */
+/* the mirrors no longer open a card — the glass itself is the show:
+   see the mirror-ghost engine below (hover = smoke = a different Diana) */
+
+/* ============ mirror ghosts — a different Diana behind every glass =========
+   All positioning is CSS (anchored to each mirror's own box); this engine
+   only deals the photos and runs the smoke-swap. */
+(function(){
+  /* Vision-detected face centers per photo, so the glass always crops TO
+     Diana's face (object-position); anything undetected gets a head-height
+     default. Regenerate with tools/faces.swift when photos change. */
+  const FACE_POS={'forest-01':'48% 39%','forest-02':'43% 36%','forest-03':'47% 43%',
+    'forest-05':'50% 26%','forest-06':'50% 26%','funhouse-01':'51% 29%',
+    'funhouse-02':'45% 27%','funhouse-03':'55% 14%','funhouse-04':'62% 36%',
+    'funhouse-05':'50% 27%','funhouse-06':'55% 21%','funhouse-07':'43% 16%',
+    'funhouse-08':'51% 20%','funhouse-09':'39% 38%','funhouse-10':'51% 43%',
+    'sea-02':'46% 33%','sea-03':'44% 43%','sea-05':'49% 43%','sea-06':'46% 35%',
+    'sea-07':'51% 35%','sea-08':'60% 24%','sea-09':'70% 36%','temple-02':'45% 28%',
+    'temple-04':'36% 41%','temple-05':'47% 51%','temple-06':'67% 22%',
+    'temple-08':'37% 26%'};
+  const facePos=src=>{const m=src.match(/pol\/(.+)\.webp$/);
+    return (m&&FACE_POS[m[1]])||'50% 18%';};
+  const deck=ALL_MEMS.slice();
+  for(let i=deck.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));
+    const t=deck[i];deck[i]=deck[j];deck[j]=t;}
+  let di=0;const next=()=>deck.length?deck[di++%deck.length]:'';
+  function setSrc(g,src){g.src=src;g.style.objectPosition=facePos(src);}
+  function makeGhost(host){
+    const g=document.createElement('img');g.className='mghost';g.alt='';
+    const p=document.createElement('span');p.className='smokepuff';
+    g.onerror=()=>{setSrc(g,next());};
+    setSrc(g,next());
+    host.appendChild(g);host.appendChild(p);
+    let busy=false;
+    const trigger=()=>{
+      if(busy)return;busy=true;
+      glassTing();
+      g.classList.add('out');
+      p.classList.remove('go');void p.offsetWidth;p.classList.add('go');
+      setTimeout(()=>{setSrc(g,next());},600);
+      setTimeout(()=>{g.classList.remove('out');busy=false;},1250);};
+    host.addEventListener('pointerenter',trigger);
+    host.addEventListener('click',e=>{e.stopPropagation();trigger();});}
+  ['mir-tall','mir-oval','mir-roses','mg-stand','mg-hall'].forEach(id=>{
+    const el=document.getElementById(id);if(el)makeGhost(el);});
+})();
+/* the television plays her ACTUAL channel: one video at a time, freshly
+   shuffled every time it is switched on, with a next-video dial. The
+   funhouse music steps aside while the set is on. */
+let tvOpen=false,tvOrder=[],tvIdx=0;
+function tvShow(){
+  const v=tvOrder[tvIdx%tvOrder.length];
+  const screen = v.f
+    ? '<div class="tvwrap own"><video controls autoplay playsinline preload="metadata" '+
+        'poster="assets/tv/'+v.f+'.jpg" src="assets/tv/'+v.f+'.mp4"></video></div>'
+    : '<div class="tvwrap"><iframe src="https://www.youtube.com/embed/'+v.id+
+        '?autoplay=1&rel=0" title="'+v.t+'" frameborder="0" '+
+        'allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>';
+  document.getElementById('room-body').innerHTML=screen+
+    '<p class="tvtitle">'+v.t+'</p>'+
+    '<button id="tv-next" class="room-cta">next video</button>';
+  const own=document.querySelector('.tvwrap.own video');
+  if(own){
+    /* the world goes quiet under her own voice, and comes back after */
+    own.addEventListener('play',()=>{if(typeof songStop==='function')songStop();clipOn=true;});
+    ['pause','ended'].forEach(e=>own.addEventListener(e,()=>{clipOn=false;}));
+  }else{clipOn=false;}
+  document.getElementById('tv-next').addEventListener('click',()=>{clipOn=false;tvIdx++;tvShow();});}
+const tvHot=document.getElementById('tv-hot');
+if(tvHot)tvHot.addEventListener('pointerenter',tvFuzz);
+if(tvHot)tvHot.addEventListener('click',()=>{tvFuzz();
+  tvOrder=shuffled(TV_ALL);
+  tvIdx=0;tvOpen=true;
+  openRoomWide('The Television','');tvShow();});
+/* the reel: every video as a grid — thumbnails that become players */
+function reelRoom(){
+  openRoomWide('The Reel',
+    '<div class="ytgrid">'+TV_ALL.map(v=>
+      '<button class="ytthumb" data-id="'+(v.id||'')+'" data-f="'+(v.f||'')+
+      '" data-t="'+v.t+'" aria-label="Play: '+v.t+'">'+
+      '<img loading="lazy" src="'+(v.f?'assets/tv/'+v.f+'.jpg'
+        :'https://i.ytimg.com/vi/'+v.id+'/hqdefault.jpg')+'" alt="">'+
+      '<span class="ytplay">&#9654;</span><span class="ytt">'+v.t+'</span></button>').join('')+'</div>');
+  document.querySelectorAll('.ytthumb').forEach(b=>b.addEventListener('click',()=>{
+    const w=document.createElement('div');w.className='tvwrap ingrid';
+    w.innerHTML=b.dataset.f
+      ? '<video controls autoplay playsinline preload="metadata" poster="assets/tv/'+
+        b.dataset.f+'.jpg" src="assets/tv/'+b.dataset.f+'.mp4"></video>'
+      : '<iframe src="https://www.youtube.com/embed/'+b.dataset.id+
+        '?autoplay=1&rel=0" title="'+b.dataset.t+'" frameborder="0" '+
+        'allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+    const v=w.querySelector('video');
+    if(v){v.addEventListener('play',()=>{if(typeof songStop==='function')songStop();clipOn=true;});
+      ['pause','ended'].forEach(e=>v.addEventListener(e,()=>{clipOn=false;}));}
+    b.replaceWith(w);}));}
+/* THE ALBUM — her answer to "can photos be in a book". Two photographs to
+   a spread, mounted on album card with her caption written under each, and
+   the pages turn. LAUREN 8/24: this book is IN the temple, so it holds the
+   TEMPLE's photographs and only those — it is that realm's album, not a
+   gallery of the whole site. It reads REALM_PHOTOS['ch-temple'] directly, so
+   a photo Diana deletes leaves the book at the same moment it leaves the
+   realm, and a temple photo she adds appears here without another edit. */
+function albumRoom(){
+  const all=REALM_PHOTOS['ch-temple'].slice();
+  let pg=0;const per=2,last=Math.max(0,Math.ceil(all.length/per)-1);
+  const draw=()=>{
+    const slice=all.slice(pg*per,pg*per+per);
+    document.getElementById('album-pages').innerHTML=slice.map(n=>
+      '<figure class="apage"><img loading="lazy" src="assets/pol/'+n+'.webp" '+
+      'alt="" style="object-position:'+(POL_POS[n]||'50% 38%')+'">'+
+      '<figcaption>'+(MEM_CAPS[n]||'&nbsp;')+'</figcaption></figure>').join('');
+    document.getElementById('album-num').textContent=(pg+1)+' / '+(last+1);
+    document.getElementById('album-prev').disabled=pg===0;
+    document.getElementById('album-next').disabled=pg===last;};
+  openRoomWide('Her Photographs',
+    '<div class="album"><div id="album-pages" class="aspread"></div>'+
+    '<div class="anav"><button id="album-prev" class="room-cta">&larr; back</button>'+
+    '<span id="album-num" class="anum"></span>'+
+    '<button id="album-next" class="room-cta">turn the page &rarr;</button></div></div>');
+  const turn=d=>{pg=Math.min(last,Math.max(0,pg+d));pageFlutter();draw();};
+  document.getElementById('album-prev').addEventListener('click',e=>{e.stopPropagation();turn(-1);});
+  document.getElementById('album-next').addEventListener('click',e=>{e.stopPropagation();turn(1);});
+  draw();}
+/* photos: every photograph she has given the world, in one grid — the
+   scene-assigned ones and the unsorted pool together (DECK). Lazy-loaded,
+   so a 100-photo grid still costs only what is scrolled into view. */
+function photosRoom(){
+  const all=DECK.slice();
+  openRoomWide('Photographs',
+    '<div class="phgrid">'+all.map(n=>
+      '<img loading="lazy" src="assets/pol/'+n+'.webp" alt="Diana" '+
+      'style="object-position:'+(POL_POS[n]||'50% 38%')+'">').join('')+'</div>');}
+/* bio & press — VERBATIM from her own EPK (Diana EPK.pdf, texted to Lauren
+   2026-08-23). The [BRACKET] placeholder draft it replaces was never hers.
+   Do not rewrite this copy: it is the bio she sends to venues. The venue
+   list and the booking address come off the same sheet. */
+const BIO=[
+  'Diana Harkin is an Irish-born, New York–based singer-songwriter whose '+
+  'voice carries both the grit of the road and the soul of a storyteller. '+
+  'Having performed across Europe and the United States, she has brought '+
+  'her unmistakable sound to festivals, clubs, intimate bars, and even '+
+  'down the aisle for countless wedding ceremonies&mdash;each performance '+
+  'marked by emotional depth and raw authenticity.',
+  'Equally at home as a solo artist or collaborator, Diana has lent her '+
+  'vocals to several dance tracks, showcasing her versatility across '+
+  'genres. She is also the frontwoman and songwriter for the band Dirty '+
+  'Bitch, where her fearless creativity and commanding stage presence '+
+  'take center stage.',
+  'With a voice that can both soothe and shake you, and a presence that '+
+  'lingers long after the final note, Diana Harkin is a truly unique '+
+  'artist&mdash;powerful, versatile, and unapologetically herself.'];
+const VENUES=['Madame George','Woodside Queens Festival',
+  'Broadway Night Off','Doyle&rsquo;s Corner','Paddy Reilly&rsquo;s Music Bar'];
+/* PERFORMANCE CLIPS — her own EPK ends with "WATCH PERFORMANCE CLIPS HERE"
+   pointing at a Drive folder ("Diana's EPK Assets"). This is that folder,
+   in her world instead of in Drive: 5 of the 7 clips, re-encoded to a long
+   edge of 1080 at ~1.2 Mbps. The two the folder also holds are 352x200
+   forwards, not masters — they would look worse than nothing, so they are
+   deliberately left out; ask her for those two at full size.
+   These are NOT scrub videos, so the project's all-intra rule does not
+   apply and MUST NOT be applied here — they are ordinary playback with
+   native controls. preload="none" + a poster frame means a visitor who
+   never presses play downloads ~40 KB, not 61 MB. */
+const PRESS_CLIPS=[
+  {f:'the-band-set',      t:'With the band'},
+  {f:'woodside-festival', t:'Woodside Queens Festival'},
+  {f:'woodside-crowd',    t:'Woodside &mdash; from the field'},
+  {f:'acoustic-set',      t:'Acoustic set'},
+  {f:'on-stage',          t:'On stage'}];
+function bioRoom(){
+  openRoomWide('Bio & Press',
+    '<div class="biobody">'+BIO.map(x=>'<p>'+x+'</p>').join('')+
+    '<p class="bio-head">recently performed at</p>'+
+    '<p class="bio-venues">'+VENUES.join(' &middot; ')+'</p></div>'+
+    '<p class="bio-head">watch her play</p>'+
+    '<div class="clipgrid">'+PRESS_CLIPS.map(c=>
+      '<button class="clip" data-f="'+c.f+'" aria-label="Play: '+c.t.replace(/&mdash;/g,'-')+'">'+
+      /* eager, deliberately: the room itself is already on-demand, so these
+         5 posters (~250 KB total) only exist once someone opens the book —
+         lazy would add an IntersectionObserver dependency for nothing, and
+         a video grid that renders blank is worse than the bytes. */
+      '<img src="assets/press/'+c.f+'.jpg" alt="">'+
+      '<span class="clipplay">&#9654;</span><span class="clipt">'+c.t+'</span></button>').join('')+'</div>'+
+    '<a class="room-cta" href="mailto:dianaharkin@gmail.com?subject=Press%20%2F%20Booking%20-%20Diana%20Harkin">press &amp; booking</a>');
+  /* the poster becomes the player in place — one clip at a time, and the
+     room's own close() wipes the whole body, so nothing keeps playing */
+  document.querySelectorAll('.clip').forEach(b=>b.addEventListener('click',e=>{
+    e.stopPropagation();
+    document.querySelectorAll('.clipwrap video').forEach(v=>v.pause());
+    const w=document.createElement('div');w.className='clipwrap';
+    w.innerHTML='<video controls playsinline preload="metadata" '+
+      'poster="assets/press/'+b.dataset.f+'.jpg" '+
+      'src="assets/press/'+b.dataset.f+'.mp4"></video>';
+    b.replaceWith(w);
+    const v=w.querySelector('video');v.play().catch(()=>{});
+    /* her voice and the world's voice must never talk over each other — but
+       DUCK the realm, never touch the mute switch. That switch belongs to
+       the visitor; flipping it for them leaves the whole world silent after
+       the clip ends and looks like a bug. Same mechanism the television
+       already uses (tvOpen). */
+    v.addEventListener('play',()=>{if(typeof songStop==='function')songStop();
+      clipOn=true;});
+    ['pause','ended'].forEach(e=>v.addEventListener(e,()=>{clipOn=false;}));}));}
+/* the music: every platform that plays her, one door each */
+function musicRoom(){
+  openRoomWide('The Music',
+    '<p>The record keeps spinning while you browse. Every song is a door somewhere else in Dianaland.</p>'+
+    '<div class="linkcol">'+MUSIC_LINKS.map(l=>
+      '<a class="room-cta" target="_blank" rel="noopener" href="'+l.u+'">'+l.n+'</a>').join('')+'</div>');}
+/* the telephone is the in-world BOOKING line (decision 8/20): it wears the
+   word, and its room carries a real mailto */
+const phoneHot=document.getElementById('phone-hot');
+if(phoneHot)phoneHot.addEventListener('pointerenter',phoneRing);
+/* on touch there is no hover — the phone rings the moment a finger lands */
+if(phoneHot)phoneHot.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')phoneRing();});
+if(phoneHot)phoneHot.addEventListener('click',()=>{phoneRing();openRoomHTML('The Red Telephone',
+  'It still has a dial tone. Pick it up to book a show, or just to hear who answers.'+
+  '<a class="room-cta" href="mailto:dianaharkin@gmail.com?subject=Booking%20Diana">'+
+  'book a show &rarr; dianaharkin@gmail.com</a>');});
+/* the record — every song is a door somewhere else in Dianaland */
+const recHot=document.getElementById('record-hot');
+if(recHot)recHot.addEventListener('click',e=>{e.stopPropagation();recordScratch();
+  musicRoom();});
+/* THE DOLL — Diana's own idea, in her own words (intake, 8/22): two photos
+   of herself, "I have been both these woman and many in between." They
+   cross-fade forever. The two files are still to come; until they land the
+   room shows the line alone rather than two broken frames — onerror hides
+   the whole plate, so this ships either way. */
+const DOLL_LINE='I have been both these woman and many in between.. remember '+
+  'you chose the form in which you want to live, choose wisely';
+function dollRoom(){
+  openRoomHTML('The Doll',
+    '<div class="dollfade" id="doll-fade">'+
+      '<img src="assets/doll-then.webp" alt="" class="d-then">'+
+      '<img src="assets/doll-now.webp" alt="" class="d-now">'+
+    '</div>'+
+    '<p class="doll-line">&ldquo;'+DOLL_LINE+'&rdquo;</p>');
+  const f=document.getElementById('doll-fade');
+  let missing=0;
+  f.querySelectorAll('img').forEach(im=>{
+    im.onerror=()=>{if(++missing)f.style.display='none';};
+    if(im.complete&&!im.naturalWidth)im.onerror();});}
+const dollHot=document.getElementById('doll-hot');
+if(dollHot){dollHot.addEventListener('pointerenter',dollGiggle);
+  dollHot.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')dollGiggle();});
+  dollHot.addEventListener('click',()=>{dollGiggle();dollRoom();});}
+const dfHot=document.getElementById('diana-forest-hot');
+if(dfHot)dfHot.addEventListener('click',()=>{sparkle();openRoom('She Is Here',
+  'Sometimes Diana is simply present in her world. She turns toward you for a moment - then the leaves close around her again.');});
+/* DIANA 8/23, two lines of the same note: "Black book bio." and "Temple:
+   can photos be in a book." The shelf has exactly two books, so each one
+   answers one line — the dark leather one carries her bio, the red one is
+   the photo album. Both replaced placeholder rooms that said "coming". */
+const bkNavy=document.getElementById('book-navy');
+if(bkNavy){bkNavy.setAttribute('aria-label',
+  'A black leather book, gold-tooled — her story');
+  bkNavy.addEventListener('click',e=>{e.stopPropagation();pageFlutter();bioRoom();});}
+const bkRed=document.getElementById('book-red');
+if(bkRed){bkRed.setAttribute('aria-label',
+  'A red leather book with gold flowers — her photographs');
+  bkRed.addEventListener('click',e=>{e.stopPropagation();pageFlutter();albumRoom();});}
+/* the giant candle's tap lives in alphaHotspot('ch-temple', …) above */
+/* the shelf breathes: one hover frees the books, the next calls them home
+   (mouse toggles on enter, touch on tap — never both for one gesture) */
+const shelfHot=document.getElementById('shelf-hot');
+if(shelfHot){const t=document.getElementById('ch-temple');
+  let lastTog=0;
+  const toggle=()=>{const n=performance.now();if(n-lastTog<700)return;lastTog=n;
+    t.classList.toggle('books-out');pageFlutter();};
+  shelfHot.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')toggle();});
+  /* touch toggles on FINGER-DOWN, not click — iOS clicks are flaky under a
+     touch-action:none stage, and the 700ms debounce absorbs any double */
+  shelfHot.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse')toggle();});
+  shelfHot.addEventListener('click',e=>{e.stopPropagation();
+    if(e.pointerType!=='mouse')toggle();});}
+
+/* ============ funhouse sounds — TV fuzz, phone ring, doll giggle ============ */
+/* a tiny music-box giggle, sweet and slightly wrong — like her */
+let lastGig=0;
+function dollGiggle(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastGig<2200)return;lastGig=n;
+  const t=c.currentTime;
+  [988,1175,932,784,880].forEach((f,i)=>{
+    const o=c.createOscillator();o.type='triangle';
+    const s=t+i*.11+(Math.random()-.5)*.015;
+    o.frequency.setValueAtTime(f*(1+(Math.random()-.5)*.02),s);
+    o.frequency.exponentialRampToValueAtTime(f*.86,s+.09);
+    const g=c.createGain();
+    g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(.055,s+.012);
+    g.gain.exponentialRampToValueAtTime(.0004,s+.16);
+    o.connect(g);g.connect(c.destination);o.start(s);o.stop(s+.18);});}
+let lastFuzz=0,lastRing=0;
+function tvFuzz(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastFuzz<1600)return;lastFuzz=n;
+  const t=c.currentTime,dur=1.1;
+  const buf=c.createBuffer(1,c.sampleRate*dur,c.sampleRate);
+  const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const src=c.createBufferSource();src.buffer=buf;
+  const hp=c.createBiquadFilter();hp.type='highpass';hp.frequency.value=900;
+  const env=c.createGain();env.gain.setValueAtTime(0,t);
+  env.gain.linearRampToValueAtTime(.09,t+.05);
+  env.gain.setValueAtTime(.07,t+.7);env.gain.linearRampToValueAtTime(0,t+dur);
+  src.connect(hp);hp.connect(env);env.connect(c.destination);src.start(t);src.stop(t+dur);}
+function phoneRing(){const c=ac();if(!c||c.state!=='running')return;
+  const n=performance.now();if(n-lastRing<2600)return;lastRing=n;
+  const t=c.currentTime;
+  [0,1.15].forEach(off=>{  /* two classic ring bursts */
+    const g=c.createGain();g.gain.value=0;g.connect(c.destination);
+    [440,480].forEach(f=>{const o=c.createOscillator();o.type='sine';o.frequency.value=f;
+      o.connect(g);o.start(t+off);o.stop(t+off+.85);});
+    const trem=c.createOscillator();trem.frequency.value=21;
+    const tg=c.createGain();tg.gain.value=.028;
+    trem.connect(tg);tg.connect(g.gain);trem.start(t+off);trem.stop(t+off+.85);
+    g.gain.setValueAtTime(0,t+off);g.gain.linearRampToValueAtTime(.05,t+off+.03);
+    g.gain.setValueAtTime(.05,t+off+.75);g.gain.linearRampToValueAtTime(0,t+off+.85);});}
+
+/* ============ the television static — snow rendered live, WebGL-cheap 2D ============ */
+(function(){
+  const cv=document.getElementById('tv-static');if(!cv)return;
+  const cx=cv.getContext('2d',{alpha:false});
+  let last=0;
+  function snow(ts){requestAnimationFrame(snow);
+    if(!document.getElementById('ch-funhouse').classList.contains('on'))return;
+    if(ts-last<50)return;last=ts;   /* ~20fps: real broadcast snow flickers slow */
+    const w=cv.width=96,h=cv.height=72;  /* tiny buffer upscaled = fat analog grain */
+    const img=cx.createImageData(w,h),d=img.data;
+    for(let i=0;i<d.length;i+=4){const v=(Math.random()*255)|0;
+      d[i]=v;d[i+1]=v;d[i+2]=v+((Math.random()*24)|0);d[i+3]=255;}
+    cx.putImageData(img,0,0);
+    /* a rolling darker band, like a lost vertical hold */
+    const y=(ts/28)%(h*1.6)-h*0.3;
+    cx.fillStyle='rgba(0,0,0,0.28)';cx.fillRect(0,y,w,h*0.14);}
+  requestAnimationFrame(snow);
+})();
+</script>
+</body></html>

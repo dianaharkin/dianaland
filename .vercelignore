@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────
+#  PRIVACY — READ BEFORE EDITING THIS FILE
+#
+#  Vercel serves every file in a deploy at its own public URL, with no login.
+#  Verified 2026-08-20: dianaland.vercel.app/assets/alocasia-g.webp → 200.
+#
+#  Diana's writing lives in this same repo. If `writing/` ever ships, it is one
+#  guessed URL away from anyone. The repo being private on GitHub does NOT
+#  protect a deployed file. Nothing in `writing/` has been cleared for an
+#  audience — see writing/PERMISSIONS.md.
+#
+#  `/ship` verifies this after every deploy by requesting a known corpus file
+#  and confirming it 404s. If that check ever fails, the site comes down first
+#  and questions get asked second.
+# ─────────────────────────────────────────────────────────────
+writing/
+*.md
+.claude/
+.DS_Store

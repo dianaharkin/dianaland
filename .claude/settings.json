@@ -1,0 +1,26 @@
+{
+  "//": "Pre-approved so Diana is never asked to judge a prompt she has no basis to judge. See CLAUDE.md rule 7.",
+  "permissions": {
+    "allow": [
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "Bash(git *)",
+      "Bash(vercel *)",
+      "Bash(curl *)",
+      "Bash(sips *)",
+      "Bash(cwebp *)",
+      "mcp__*"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
+    ],
+    "deny": [
+      "Read(./writing/corpus/**)",
+      "Write(./.vercelignore)"
+    ],
+    "//deny": "The site work never needs to read her corpus. The Claude Project on her phone is where that lives. .vercelignore is write-protected because removing 'writing/' would publish her journals."
+  }
+}
