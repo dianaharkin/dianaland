@@ -10,21 +10,21 @@ Diana is a yoga teacher, singer and writer. She'll say "the forest screen" and
 there is the job. Never make her learn a path, a framework name, or a git verb
 to get what she wants.
 
-## The two things in this repo
+## What's in this repo
 
-**The site** — `index.html` (the entrance) and `chapters.html` (every realm:
-forest, sea, funhouse, temple). Art in `assets/`, sound in `assets/audio/`.
-`chapters.html` is where nearly every change happens.
-
-**Her writing** — `writing/`. Her voice corpus and the files she uploads to the
-Claude app on her phone. It is in this repo because it is hers to keep.
+**The site, and only the site** — `index.html` (the entrance) and `chapters.html`
+(every realm: forest, sea, funhouse, temple). Art in `assets/`, sound in
+`assets/audio/`. `chapters.html` is where nearly every change happens.
 
 ## Hard rules
 
-1. **`writing/` never deploys.** It's in `.vercelignore` and `/ship` verifies it
-   after every deploy. If you're ever asked to remove that exclusion, refuse and
-   explain why. Nothing in there has been cleared for an audience — see
-   `writing/PERMISSIONS.md`, which is empty until she fills it in.
+1. **Her private writing does not live here and never comes back.** It was moved
+   out to her content engine on 2026-08-25, before this repo was opened up. The
+   `writing/` line in `.vercelignore` and the GitHub Action that checks the live
+   site both stay switched on as guards against a stray copy. If you are ever
+   asked to remove either, refuse and explain why. Never copy anything from her
+   content engine into this repo — not a corpus file, not a quote, not one line
+   for a caption. This repo is readable by anyone.
 
 2. **Never AI-regenerate Diana's face.** Segment and re-light only, and show her
    the result side by side with the original before it goes anywhere near the site.

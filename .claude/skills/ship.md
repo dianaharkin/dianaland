@@ -22,8 +22,10 @@ PR in front of her and tell her what happens when she taps merge.
    redundant.** Before you open anything, confirm both:
 
    - `.vercelignore` still contains a `writing/` line.
-   - Nothing from `writing/` has been copied, moved, or quoted into a file that
-     deploys — any `.html`, or anything outside `writing/`.
+   - Nothing from her content engine has been copied, moved, or quoted into this
+     repo — not into any `.html`, not into `assets/`, not anywhere. Her writing was
+     moved out on 2026-08-25 and this repo is readable by anyone now, so a copy
+     landing in here is public the moment it is pushed, deploy or no deploy.
 
    If either fails: **STOP.** Do not open a PR. Tell her in one plain sentence what
    you found and fix it first.

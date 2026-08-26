@@ -15,7 +15,7 @@ If she asks for the whole map, give her this and nothing more:
 - **Everything else** — forest, sea, funhouse, temple. `chapters.html`
 - **The pictures** — `assets/`
 - **The sounds** — `assets/audio/`
-- **Her writing** — `writing/`. Never goes on the internet.
+- **Her writing** — not in this repo. It lives in her content engine.
 
 When she names a thing ("the lion shadow", "the fish"), find it and tell her which
 screen it's on and roughly where. Offer to change it. Don't explain the code.

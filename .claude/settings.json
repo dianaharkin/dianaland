@@ -21,6 +21,6 @@
       "Read(./writing/corpus/**)",
       "Write(./.vercelignore)"
     ],
-    "//deny": "The site work never needs to read her corpus. The Claude Project on her phone is where that lives. .vercelignore is write-protected because removing 'writing/' would publish her journals."
+    "//deny": "The site work never needs to read her corpus, and it is no longer in this repo — it lives in her content engine. Both rules stay as guards against a stray copy: this repo is public, so anything landing in it is published immediately."
   }
 }

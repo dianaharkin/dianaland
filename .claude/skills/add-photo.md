@@ -26,5 +26,5 @@ She drops a photo in the chat and says roughly where it goes. Everything else is
 ## Watch for
 - A baked white background on a PNG that looks transparent in the chat. Check it.
 - Photos with other people in them — ask her before they go anywhere near the site.
-- Anything that looks like a journal page. That's `writing/`, not `assets/`, and it
+- Anything that looks like a journal page. That belongs in her content engine, not `assets/`, and it
   does not go on the site.

@@ -1,5 +1,9 @@
 # Diana's writing must never be reachable on the internet.
 #
+# It was moved out of this repo on 2026-08-25, before the repo was opened up, and it
+# lives in her content engine now. This check stays anyway, as a tripwire: if a stray
+# copy ever lands back under writing/ and ships, this fails loudly.
+#
 # `.vercelignore` excludes `writing/` from every deploy, and `/ship` checks that line
 # before it opens a pull request. This is the backstop: it checks the LIVE SITE, from
 # a runner that actually has network access, after every merge and once a day.
@@ -8,8 +12,11 @@
 # repo run in the cloud with network limited to package registries and an allowlist, so a
 # session cannot fetch the live site to verify anything. A GitHub runner can.
 #
-# If this fails: the site is publicly serving her journals. Roll back in Vercel
+# If this fails: the site is publicly serving her private writing. Roll back in Vercel
 # (Deployments -> last good one -> Instant Rollback) before doing anything else.
+#
+# The probe paths below are deliberately generic. This repo is public now, and a list
+# of her exact private filenames would be a map for anyone who wanted to go looking.
 
 name: writing/ must not be public
 
@@ -52,17 +59,15 @@ jobs:
           # 2. Nothing under writing/ may be reachable.
           fail=0
           for path in \
-            "writing/PERMISSIONS.md" \
-            "writing/START-HERE.md" \
-            "writing/voice/VOICE.md" \
-            "writing/corpus/batch-001-journals-2022-2026.md" \
-            "writing/IDEA-GENERATOR.md"
+            "writing/" \
+            "writing/README.md" \
+            "writing/index.html"
           do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$SITE/$path")
             if [ "$code" = "404" ] || [ "$code" = "403" ]; then
               echo "  OK   $code  /$path"
             else
-              echo "::error::$code on /$path - Diana's writing is readable on the internet right now."
+              echo "::error::$code on /$path - something under writing/ is readable on the internet right now."
               fail=1
             fi
           done

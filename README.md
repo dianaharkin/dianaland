@@ -1,6 +1,6 @@
 # Dianaland
 
-This is your website. Every file it needs is in here, and so is your writing.
+This is your website. Every file it needs is in here.
 
 Live at **welcometodianaland.com**
 
@@ -13,19 +13,21 @@ Live at **welcometodianaland.com**
 | `chapters.html` | **The site.** The forest, the sea, the funhouse, the temple — all four rooms and everything in them live in this one file. Nearly every change you'll ever want is in here. |
 | `index.html` | The front door. It just points at `chapters.html`. |
 | `assets/` | Every picture, film and sound the site loads. Grouped so you can find things: `pol/` is the polaroids, `press/` your performance films, `tv/` the television, `audio/` the sound. |
-| `writing/` | **Yours.** Your journals, your voice file, the idea generator, and the files you upload to Claude on your phone. |
 | `.claude/` | The shortcuts. See below. |
 | `CLAUDE.md` | The rules Claude follows when it works in here. You don't have to read it. It's there so Claude does the right thing without you having to ask. |
 | `LEARNED.md` | Things that turned out to be true about this site. It grows as you use it. |
 
 ---
 
-## `writing/` never goes on the internet
+## Your writing is not in here
 
-Your journals are in this repository because they're yours and you should keep
-them in one place. They are **excluded from every deploy** — that's what the
-`writing/` line in `.vercelignore` does — and the `/ship` shortcut checks it's
-still true every single time the site goes out.
+Your writing lives in your content engine now, separately from the site. This
+repository is the site and nothing else.
+
+The guard that kept it out of every deploy is still switched on — the `writing/`
+line in `.vercelignore`, and a check that runs against the live site after every
+change. Both stay. They cost nothing and they mean a stray copy could never be
+served by accident.
 
 If anything ever asks you to remove that line, the answer is no.
 
