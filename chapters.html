@@ -3,11 +3,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Dianaland</title>
 <style>
+  @font-face{font-family:'New Rocker';font-style:normal;font-weight:400;font-display:swap;
+    src:url('assets/fonts/NewRocker.woff2') format('woff2')}
   :root{--night:#0e0716;--moon:#efe6ff;--moon-dim:#b9aed0;--amber:#ffc46b;--rose:#ff4fa3;--violet:#8a4bff;
-    --display:'Didot','Playfair Display',Georgia,serif;--ui:'Futura','Avenir Next',system-ui,sans-serif}
+    --display:'New Rocker',Georgia,serif;--ui:'New Rocker',Georgia,serif}
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden;background:#000;color:var(--moon);
-    font-family:var(--display);-webkit-user-select:none;user-select:none;
+    font-family:var(--display);font-weight:700;-webkit-user-select:none;user-select:none;
     -webkit-touch-callout:none;touch-action:none;overscroll-behavior:none}
   /* DIANA 8/23: "when I hold the lion, the lion icon shows up on screen like
      a clip art in a white square." That is iOS Safari's long-press image
@@ -137,7 +139,7 @@
   /* ---------- the index (the easy way) ---------- */
   #ch-index{background:radial-gradient(120% 100% at 50% 0%,#17101f 0%,#080409 70%)}
   #index-card{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;width:min(90vw,30rem)}
-  #index-card h2{font-style:italic;font-weight:400;letter-spacing:.4em;text-transform:uppercase;
+  #index-card h2{font-style:italic;font-weight:700;letter-spacing:.4em;text-transform:uppercase;
     font-size:clamp(1.5rem,5vw,2.4rem);margin-bottom:.5rem;
     text-shadow:0 0 40px rgba(138,75,255,.5)}
   #index-card .sub{font-style:italic;color:var(--moon-dim);margin-bottom:2.4rem}
@@ -311,7 +313,7 @@
      to 159 characters and a back is only ~140x145, so sixteen of them
      overflowed the cream card and spilled onto the scene. Rather than cap
      what she is allowed to write, the handwriting gets smaller. */
-  .mempol .back h4{font-family:var(--display);font-style:italic;font-weight:400;color:#3a2c22;
+  .mempol .back h4{font-family:var(--display);font-style:italic;font-weight:700;color:#3a2c22;
     font-size:calc(clamp(.72rem,1.6vmin,.95rem) * var(--fit,1));
     letter-spacing:.06em;margin-bottom:.35em}
   .mempol .back p{font-family:var(--display);font-style:italic;color:#5a4a3c;
@@ -713,7 +715,7 @@
   #roomcard{max-width:32rem;width:100%;text-align:center;border:1px solid rgba(180,120,255,.4);
     border-radius:24px;padding:3.4rem 2.4rem;background:linear-gradient(180deg,rgba(20,10,30,.94),rgba(14,7,22,.97));
     box-shadow:0 0 60px rgba(138,75,255,.55),0 0 150px rgba(138,75,255,.35)}
-  #roomcard h3{font-style:italic;font-weight:400;font-size:clamp(1.2rem,4.6vw,1.8rem);letter-spacing:.3em;
+  #roomcard h3{font-style:italic;font-weight:700;font-size:clamp(1.2rem,4.6vw,1.8rem);letter-spacing:.3em;
     text-transform:uppercase;margin-bottom:1.1rem;
     text-shadow:0 0 26px rgba(255,196,107,.55),0 0 70px rgba(138,75,255,.5)}
   #roomcard p{color:var(--moon-dim);line-height:1.8;margin-bottom:1.5rem;font-size:.98rem}
